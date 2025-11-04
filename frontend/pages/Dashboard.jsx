@@ -1,115 +1,121 @@
 // frontend/src/pages/Dashboard.jsx
 import React, { useEffect, useState } from 'react';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
+import { Doughnut } from 'react-chartjs-2';
+import { toast } from 'react-hot-toast';
+
+ChartJS.register(ArcElement, Tooltip, Legend);
 
 const ICONS = {
   faqs: { icon: '❓', bg: 'bg-blue-100 text-blue-600' },
-  unanswered: { icon: '🌞', bg: 'bg-yellow-100 text-yellow-600' },
+  unanswered: { icon: '🤔', bg: 'bg-yellow-100 text-yellow-600' },
   accuracy: { icon: '✅', bg: 'bg-green-100 text-green-600' },
   today: { icon: '⏰', bg: 'bg-purple-100 text-purple-600' },
 };
 
 const Dashboard = () => {
   const [stats, setStats] = useState(null);
-  const [recentQuestions, setRecentQuestions] = useState([]);
+  const [recentActivity, setRecentActivity] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   useEffect(() => {
-    async function fetchStats() {
+    const fetchData = async () => {
       setLoading(true);
-      setError('');
+      const loadingToast = toast.loading('Fetching dashboard data...');
       try {
-        const res = await fetch('https://agent-faq.onrender.com/api/analytics');
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        const data = await res.json();
-        setStats(data);
-        setRecentQuestions([
-          {
-            question: 'How do I reset my password?',
-            matched: true,
-            time: '2 minutes ago',
-          },
-          {
-            question: 'What are the system requirements?',
-            matched: true,
-            time: '15 minutes ago',
-          },
-          {
-            question: 'Can I integrate with third-party tools?',
-            matched: false,
-            time: '1 hour ago',
-          },
-          {
-            question: 'How do I export my data?',
-            matched: true,
-            time: '2 hours ago',
-          },
-          {
-            question: 'What is the pricing structure?',
-            matched: true,
-            time: '3 hours ago',
-          },
+        // Fetch analytics and recent questions in parallel
+        const [analyticsRes, questionsRes] = await Promise.all([
+          fetch('https://agent-faq.onrender.com/api/analytics'),
+          fetch('https://agent-faq.onrender.com/api/unknown-questions?limit=5'),
         ]);
+
+        if (!analyticsRes.ok) throw new Error(`Analytics API error: ${analyticsRes.statusText}`);
+        if (!questionsRes.ok) throw new Error(`Questions API error: ${questionsRes.statusText}`);
+
+        const analyticsData = await analyticsRes.json();
+        const questionsData = await questionsRes.json();
+
+        setStats(analyticsData);
+        setRecentActivity(questionsData.map((q) => ({ ...q, matched: false }))); // Assuming unknown questions are unmatched
+
+        toast.success('Data loaded successfully!', { id: loadingToast });
       } catch (err) {
-        setError('Failed to load analytics data. Please check if the API server is running.');
+        console.error('Fetch error:', err);
+        toast.error(`Failed to load data: ${err.message}`, { id: loadingToast });
       } finally {
         setLoading(false);
       }
-    }
-    fetchStats();
+    };
+
+    fetchData();
   }, []);
 
+  const doughnutData = {
+    labels: ['Answered', 'Unanswered'],
+    datasets: [
+      {
+        data: [stats ? stats.totalFaqs : 0, stats ? stats.totalUnknown : 0],
+        backgroundColor: ['#34D399', '#FBBF24'],
+        hoverBackgroundColor: ['#10B981', '#F59E0B'],
+        borderColor: '#ffffff',
+        borderWidth: 2,
+      },
+    ],
+  };
+
   return (
-    <div className="p-8 bg-gradient-to-br from-gray-50 to-white min-h-screen">
-      <h2 className="text-4xl font-extrabold mb-2 text-gray-900 tracking-tight">Dashboard Overview</h2>
-      <p className="text-gray-500 mb-10 text-lg">Monitor your FAQ system performance and activity</p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-10">
-        <StatCard label="Total FAQs" value={stats ? stats.totalFaqs : '--'} {...ICONS.faqs} />
-        <StatCard label="Unanswered" value={stats ? stats.totalUnknown : '--'} {...ICONS.unanswered} />
-        <StatCard label="Accuracy" value={stats && stats.accuracy !== null ? `${stats.accuracy}%` : '--'} {...ICONS.accuracy} />
-        <StatCard label="Today's Questions" value={stats ? stats.todayQuestions || 18 : '--'} {...ICONS.today} />
+    <div className="p-6 bg-gray-50 min-h-screen">
+      <h1 className="text-3xl font-bold mb-6 text-gray-800">Dashboard</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <StatCard label="Total FAQs" value={stats?.totalFaqs ?? '--'} {...ICONS.faqs} />
+        <StatCard label="Unanswered" value={stats?.totalUnknown ?? '--'} {...ICONS.unanswered} />
+        <StatCard label="Accuracy" value={stats?.accuracy != null ? `${stats.accuracy}%` : '--'} {...ICONS.accuracy} />
+        <StatCard label="Today's Activity" value={stats?.todayQuestions ?? '--'} {...ICONS.today} />
       </div>
-      <div className="bg-white rounded-2xl shadow-lg p-8">
-        <div className="text-xl font-bold mb-6 text-gray-800 flex items-center gap-2">
-          <span className="text-blue-500 text-2xl">🕑</span> Recent User Questions
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Recent Activity */}
+        <div className="lg:col-span-2 bg-white rounded-lg shadow-md p-6">
+          <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
+          <div className="space-y-4">
+            {recentActivity.length > 0 ? (
+              recentActivity.map((item, idx) => <ActivityItem key={idx} {...item} />)
+            ) : (
+              <p className="text-gray-500">No recent activity to display.</p>
+            )}
+          </div>
         </div>
-        <div className="space-y-4">
-          {recentQuestions.map((q, idx) => (
-            <div
-              key={idx}
-              className={`flex items-center px-5 py-4 rounded-xl border-l-4 shadow-sm ${q.matched ? 'border-green-400 bg-green-50' : 'border-orange-400 bg-orange-50'}`}
-            >
-              <span className={`mr-4 text-lg font-bold ${q.matched ? 'text-green-500' : 'text-orange-400'}`}>{q.matched ? '✔️' : '⚠️'}</span>
-              <div className="flex-1">
-                <div className="font-semibold text-gray-900 text-base">{q.question}</div>
-                <div className="text-xs text-gray-500 mt-1">
-                  Asked {q.time} • {q.matched ? <span className="text-green-600 font-medium">Matched with existing FAQ</span> : <span className="text-orange-600 font-medium">No match found</span>}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="flex justify-end mt-8">
-          <button className="bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white px-8 py-3 rounded-xl font-bold shadow-lg transition flex items-center gap-2">
-            <span>Review Unknown Questions</span>
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L21 12m0 0l-3.75 5.25M21 12H3" />
-            </svg>
-          </button>
+
+        {/* Chart */}
+        <div className="bg-white rounded-lg shadow-md p-6 flex flex-col items-center justify-center">
+          <h2 className="text-xl font-semibold mb-4">FAQ Distribution</h2>
+          <div style={{ width: '100%', maxWidth: '250px' }}>
+            {stats && <Doughnut data={doughnutData} />}
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-function StatCard({ icon, bg, value, label }) {
-  return (
-    <div className="bg-white rounded-2xl shadow-lg p-7 flex flex-col items-center group hover:shadow-2xl transition">
-      <div className={`w-14 h-14 flex items-center justify-center rounded-full mb-4 text-3xl font-bold shadow ${bg} group-hover:scale-105 transition`}>{icon}</div>
-      <div className="text-3xl font-extrabold text-gray-900 mb-1">{value}</div>
-      <div className="text-gray-500 text-base font-medium tracking-wide">{label}</div>
+const StatCard = ({ icon, bg, value, label }) => (
+  <div className="bg-white rounded-lg shadow p-5 flex items-center hover:shadow-lg transition-shadow">
+    <div className={`w-12 h-12 flex items-center justify-center rounded-full mr-4 text-2xl ${bg}`}>{icon}</div>
+    <div>
+      <div className="text-2xl font-bold text-gray-800">{value}</div>
+      <div className="text-gray-500">{label}</div>
     </div>
-  );
-}
+  </div>
+);
+
+const ActivityItem = ({ question, matched, createdAt }) => (
+  <div className={`p-4 rounded-lg flex items-center border-l-4 ${matched ? 'bg-green-50 border-green-500' : 'bg-yellow-50 border-yellow-500'}`}>
+    <span className={`mr-3 text-xl ${matched ? 'text-green-600' : 'text-yellow-600'}`}>{matched ? '✅' : '🤔'}</span>
+    <div>
+      <p className="font-semibold text-gray-700">{question}</p>
+      <p className="text-sm text-gray-500">{new Date(createdAt).toLocaleString()}</p>
+    </div>
+  </div>
+);
 
 export default Dashboard;
