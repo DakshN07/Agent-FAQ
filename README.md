@@ -120,7 +120,7 @@ Agent-FAQ/
 
 ### **Frontend (Dashboard)**
 ```
-http://agent-faq.vercel.app
+[http://agent-faq.vercel.app](https://agent-faq-seven.vercel.app/dashboard)
 ```
 
 ### **Backend API**
