@@ -1,9 +1,14 @@
 const mongoose = require('mongoose');
 
 const unknownQuestionSchema = new mongoose.Schema({
+  eventId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Event',
+    required: false, // Required for new ones
+  },
   guildId: {
     type: String,
-    required: true,
+    required: false, // Keep optional
     index: true
   },
   text: {
@@ -19,6 +24,12 @@ const unknownQuestionSchema = new mongoose.Schema({
     default: 1
   },
   userId: {
+    type: String,
+  },
+  sourcePlatform: {
+    type: String, // e.g. discord, slack, whatsapp
+  },
+  channelId: {
     type: String,
   },
   timestamp: {

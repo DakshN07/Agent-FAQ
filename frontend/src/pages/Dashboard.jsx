@@ -10,17 +10,20 @@ import {
   ArrowDownRight,
   Activity
 } from 'lucide-react';
+import { useEvent } from '../contexts/EventContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const Dashboard = () => {
+  const { activeEvent } = useEvent();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchStats() {
+      if (!activeEvent) return;
       try {
-        const res = await fetch(`${API_URL}/api/analytics`);
+        const res = await fetch(`${API_URL}/api/analytics?eventId=${activeEvent._id}`);
         if (!res.ok) throw new Error('Network response was not ok');
         const data = await res.json();
         setStats(data);

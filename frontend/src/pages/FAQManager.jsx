@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { Plus, Search, Trash2, Edit3, Save, X } from 'lucide-react';
+import { useEvent } from '../contexts/EventContext';
 
 const FAQManager = () => {
+    const { activeEvent } = useEvent();
     const [faqs, setFaqs] = useState(([{ _id: '1', question: 'Loading...', answer: 'Fetching data...', guildId: 'default' }]));
     const [loading, setLoading] = useState(true);
 
@@ -12,12 +14,12 @@ const FAQManager = () => {
     const [newAnswer, setNewAnswer] = useState('');
 
     useEffect(() => {
-        fetchFaqs();
-    }, []);
+        if (activeEvent) fetchFaqs();
+    }, [activeEvent]);
 
     const fetchFaqs = async () => {
         try {
-            const response = await fetch('/api/faqs');
+            const response = await fetch(`/api/faqs?eventId=${activeEvent._id}`);
             if (!response.ok) throw new Error('Failed to fetch');
             const data = await response.json();
             setFaqs(data);
@@ -40,7 +42,7 @@ const FAQManager = () => {
             const res = await fetch('/api/faqs', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ question: newQuestion, answer: newAnswer, guildId: 'default' })
+                body: JSON.stringify({ question: newQuestion, answer: newAnswer, eventId: activeEvent._id })
             });
             if (!res.ok) throw new Error("Failed");
             const added = await res.json();

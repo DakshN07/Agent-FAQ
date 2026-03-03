@@ -1,14 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const storage = require('../utils/storage');
+const Faq = require('../models/Faq');
 const { getEmbedding } = require('../services/embedding');
 
-// GET all FAQs
+// GET all FAQs for an event
 router.get('/', async (req, res) => {
     try {
-        const faqs = await storage.getFaqs();
-        // Sort by createdAt desc if possible, or just reverse
-        faqs.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        const query = req.query.eventId && req.query.eventId !== 'undefined' ? { eventId: req.query.eventId } : {};
+        const faqs = await Faq.find(query).sort({ _id: -1 });
         res.json(faqs);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -18,18 +17,18 @@ router.get('/', async (req, res) => {
 // POST new FAQ
 router.post('/', async (req, res) => {
     try {
-        const { question, answer, guildId = 'default' } = req.body;
-
+        const { question, answer, eventId, platforms = [] } = req.body;
         // Generate embedding
         const embedding = await getEmbedding(question);
 
-        const newFaq = await storage.addFaq({
+        const newFaq = new Faq({
+            eventId,
             question,
             answer,
-            guildId,
+            platforms,
             embedding
         });
-
+        await newFaq.save();
         res.status(201).json(newFaq);
     } catch (error) {
         console.error("Error creating FAQ:", error);
@@ -40,9 +39,9 @@ router.post('/', async (req, res) => {
 // PUT update FAQ
 router.put('/:id', async (req, res) => {
     try {
-        const { question, answer } = req.body;
+        const { question, answer, platforms } = req.body;
 
-        let updateData = { question, answer };
+        let updateData = { question, answer, platforms };
         if (question) {
             const embedding = await getEmbedding(question);
             if (embedding) {
@@ -50,12 +49,10 @@ router.put('/:id', async (req, res) => {
             }
         }
 
-        const updatedFaq = await storage.updateFaq(req.params.id, updateData);
-
+        const updatedFaq = await Faq.findByIdAndUpdate(req.params.id, updateData, { new: true });
         if (!updatedFaq) {
             return res.status(404).json({ error: 'FAQ not found' });
         }
-
         res.json(updatedFaq);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -65,8 +62,8 @@ router.put('/:id', async (req, res) => {
 // DELETE FAQ
 router.delete('/:id', async (req, res) => {
     try {
-        const success = await storage.deleteFaq(req.params.id);
-        if (!success) {
+        const deletedFaq = await Faq.findByIdAndDelete(req.params.id);
+        if (!deletedFaq) {
             return res.status(404).json({ error: 'FAQ not found' });
         }
         res.json({ message: 'FAQ deleted successfully' });

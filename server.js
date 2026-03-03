@@ -14,11 +14,18 @@ app.use(express.json());
 const routes = require('./routes/index');
 const authRoutes = require('./routes/auth'); // Auth routes might be separate or part of index
 
-// Connect to MongoDB - REMOVED for file-based storage
-// mongoose.connect(...) 
-console.log("✅ Using Local JSON Storage (Data/ folder)");
-
-
+// Connect to MongoDB
+const connectDB = async () => {
+  try {
+    const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/agent-faq';
+    await mongoose.connect(mongoUri);
+    console.log(`✅ MongoDB Connected`);
+  } catch (err) {
+    console.error(`❌ MongoDB Connection Error: ${err.message}`);
+    // Non-blocking for now, let it run even if mongo fails initially
+  }
+};
+connectDB();
 // Use Routes
 app.use('/api', routes);
 app.use('/api/auth', authRoutes);

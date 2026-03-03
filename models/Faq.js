@@ -1,9 +1,18 @@
 const mongoose = require('mongoose');
 
 const faqSchema = new mongoose.Schema({
+  eventId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Event',
+    required: false, // temporarily false for backward compatibility
+  },
   guildId: {
     type: String,
-    required: true,
+    required: false, // Made optional to support non-discord platforms
+  },
+  platforms: {
+    type: [String],
+    default: [], // Array of active platforms
   },
   question: {
     type: String,

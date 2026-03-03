@@ -1,19 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { HelpCircle, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useEvent } from '../contexts/EventContext';
 
 const Activity = () => {
+    const { activeEvent } = useEvent();
     const [unknownQuestions, setUnknownQuestions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
     useEffect(() => {
-        fetchUnknownQuestions();
-    }, []);
+        if (activeEvent) fetchUnknownQuestions();
+    }, [activeEvent]);
 
     const fetchUnknownQuestions = async () => {
         try {
             // Use relative path with Vite proxy
-            const response = await fetch('/api/unknown-questions');
+            const response = await fetch(`/api/unknown-questions?eventId=${activeEvent._id}`);
             if (!response.ok) throw new Error('Failed to fetch unknown questions');
             const data = await response.json();
             setUnknownQuestions(data);
