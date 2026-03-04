@@ -2,6 +2,7 @@ const Integration = require('../models/Integration');
 const DiscordAdapter = require('../adapters/DiscordAdapter');
 const SlackAdapter = require('../adapters/SlackAdapter');
 const WhatsappAdapter = require('../adapters/WhatsappAdapter');
+const TelegramAdapter = require('../adapters/TelegramAdapter');
 const { getEmbedding } = require('../services/embedding');
 const { cosineSimilarity } = require('../services/similarity');
 const Faq = require('../models/Faq');

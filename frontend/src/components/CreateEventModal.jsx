@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import toast from 'react-hot-toast';
-import { X } from 'lucide-react';
+import { X, Sparkles } from 'lucide-react';
 import { useEvent } from '../contexts/EventContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -12,6 +12,29 @@ const CreateEventModal = ({ isOpen, onClose }) => {
     const [loading, setLoading] = useState(false);
     const [aiPrompts, setAiPrompts] = useState([]);
     const [step, setStep] = useState(1);
+    const [loadingPhrase, setLoadingPhrase] = useState('');
+
+    const PHRASES = [
+        "Waking up the AI...",
+        "Analyzing your event details...",
+        "Grinding those FAQs...",
+        "Reading between the lines...",
+        "Structuring knowledge base...",
+        "Almost there..."
+    ];
+
+    useEffect(() => {
+        let interval;
+        if (loading) {
+            let i = 0;
+            setLoadingPhrase(PHRASES[0]);
+            interval = setInterval(() => {
+                i = (i + 1) % PHRASES.length;
+                setLoadingPhrase(PHRASES[i]);
+            }, 2500); // Change phrase every 2.5 seconds
+        }
+        return () => clearInterval(interval);
+    }, [loading]);
 
     if (!isOpen) return null;
 
@@ -105,9 +128,14 @@ const CreateEventModal = ({ isOpen, onClose }) => {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="px-6 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-medium shadow-lg transition-all disabled:opacity-50"
+                                className="px-6 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-medium shadow-lg transition-all disabled:opacity-50 min-w-[200px]"
                             >
-                                {loading ? "Generating AI Setup..." : "Create Event & Setup"}
+                                {loading ? (
+                                    <div className="flex items-center justify-center animate-pulse">
+                                        <Sparkles className="w-4 h-4 mr-2" />
+                                        {loadingPhrase}
+                                    </div>
+                                ) : "Create Event & Setup"}
                             </button>
                         </div>
                     </form>

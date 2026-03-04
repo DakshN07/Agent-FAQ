@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Save, CheckCircle2, AlertCircle, Info } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useEvent } from '../contexts/EventContext';
 
@@ -14,6 +14,7 @@ const IntegrationManager = () => {
     const [discordToken, setDiscordToken] = useState('');
     const [slackToken, setSlackToken] = useState('');
     const [whatsappToken, setWhatsappToken] = useState('');
+    const [telegramToken, setTelegramToken] = useState('');
 
     useEffect(() => {
         if (activeEvent) fetchIntegrations();
@@ -33,10 +34,12 @@ const IntegrationManager = () => {
                 const discord = data.find(i => i.platform === 'discord');
                 const slack = data.find(i => i.platform === 'slack');
                 const whatsapp = data.find(i => i.platform === 'whatsapp');
+                const telegram = data.find(i => i.platform === 'telegram');
 
                 if (discord) setDiscordToken(discord.credentials.token || '');
                 if (slack) setSlackToken(slack.credentials.token || '');
                 if (whatsapp) setWhatsappToken(whatsapp.credentials.token || '');
+                if (telegram) setTelegramToken(telegram.credentials.token || '');
             }
         } catch (error) {
             console.error(error);
@@ -98,7 +101,13 @@ const IntegrationManager = () => {
                             <span className="flex items-center text-xs font-bold text-amber-500 bg-amber-500/10 px-2 py-1 rounded"><AlertCircle className="w-3 h-3 mr-1" /> Not Configured</span>
                         }
                     </div>
-                    <p className="text-slate-400 text-sm mb-6 flex-1">Configure your bot token to connect this event's FAQ database to a Discord server.</p>
+
+                    <div className="flex items-start bg-slate-900/50 p-3 rounded-lg border border-slate-700 mb-6">
+                        <Info className="w-4 h-4 text-primary-400 mt-0.5 mr-2 shrink-0" />
+                        <p className="text-slate-400 text-sm">
+                            Go to Discord Developer Portal, create an App & Bot, enable all Intents, and paste the Token below.
+                        </p>
+                    </div>
 
                     <div className="space-y-4">
                         <input
@@ -132,7 +141,12 @@ const IntegrationManager = () => {
                             <span className="flex items-center text-xs font-bold text-amber-500 bg-amber-500/10 px-2 py-1 rounded"><AlertCircle className="w-3 h-3 mr-1" /> Not Configured</span>
                         }
                     </div>
-                    <p className="text-slate-400 text-sm mb-6 flex-1">Configure your Bot User OAuth Token to answer questions in Slack workspaces.</p>
+                    <div className="flex items-start bg-slate-900/50 p-3 rounded-lg border border-slate-700 mb-6">
+                        <Info className="w-4 h-4 text-primary-400 mt-0.5 mr-2 shrink-0" />
+                        <p className="text-slate-400 text-sm">
+                            Create a Slack App, add Bot Token Scopes, install to workspace, and paste the <b>xoxb-</b> token below.
+                        </p>
+                    </div>
 
                     <div className="space-y-4">
                         <input
@@ -166,7 +180,12 @@ const IntegrationManager = () => {
                             <span className="flex items-center text-xs font-bold text-amber-500 bg-amber-500/10 px-2 py-1 rounded"><AlertCircle className="w-3 h-3 mr-1" /> Not Configured</span>
                         }
                     </div>
-                    <p className="text-slate-400 text-sm mb-6 flex-1">Provide your WhatsApp Business API Token to answer mobile customer queries.</p>
+                    <div className="flex items-start bg-slate-900/50 p-3 rounded-lg border border-slate-700 mb-6">
+                        <Info className="w-4 h-4 text-primary-400 mt-0.5 mr-2 shrink-0" />
+                        <p className="text-slate-400 text-sm">
+                            Register a Meta Developer App, setup WhatsApp Cloud API, and paste your Temporary or Permanent Access Token below.
+                        </p>
+                    </div>
 
                     <div className="space-y-4">
                         <input
@@ -180,6 +199,45 @@ const IntegrationManager = () => {
                             disabled={loading || !whatsappToken}
                             onClick={() => handleSave('whatsapp', whatsappToken)}
                             className="w-full py-2.5 bg-[#25D366] hover:bg-[#1DA851] text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                        >
+                            Save Configuration
+                        </button>
+                    </div>
+                </div>
+
+                {/* TELEGRAM */}
+                <div className="bg-slate-800/50 rounded-2xl border border-slate-700/50 shadow-lg p-6 flex flex-col">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                            <div className="w-12 h-12 rounded-xl bg-[#0088cc]/20 flex items-center justify-center text-[#0088cc]">
+                                <svg viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.548.295l.189-2.663 4.85-4.381c.218-.198-.046-.308-.344-.108l-6 3.778-2.583-.807c-.56-.176-.575-.562.115-.838l10.106-3.899c.46-.174.872.106.715.651z" /></svg>
+                            </div>
+                            <h3 className="text-xl font-bold text-white">Telegram</h3>
+                        </div>
+                        {isConnected('telegram') ?
+                            <span className="flex items-center text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded"><CheckCircle2 className="w-3 h-3 mr-1" /> Active</span> :
+                            <span className="flex items-center text-xs font-bold text-amber-500 bg-amber-500/10 px-2 py-1 rounded"><AlertCircle className="w-3 h-3 mr-1" /> Not Configured</span>
+                        }
+                    </div>
+                    <div className="flex items-start bg-slate-900/50 p-3 rounded-lg border border-slate-700 mb-6">
+                        <Info className="w-4 h-4 text-primary-400 mt-0.5 mr-2 shrink-0" />
+                        <p className="text-slate-400 text-sm">
+                            Message @BotFather on Telegram, type /newbot, follow the steps, and paste the HTTP API Token below.
+                        </p>
+                    </div>
+
+                    <div className="space-y-4">
+                        <input
+                            type="password"
+                            placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+                            value={telegramToken}
+                            onChange={(e) => setTelegramToken(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-[#0088cc] outline-none"
+                        />
+                        <button
+                            disabled={loading || !telegramToken}
+                            onClick={() => handleSave('telegram', telegramToken)}
+                            className="w-full py-2.5 bg-[#0088cc] hover:bg-[#0077b3] text-white rounded-lg font-medium transition-colors disabled:opacity-50"
                         >
                             Save Configuration
                         </button>

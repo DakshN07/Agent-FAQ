@@ -12,24 +12,35 @@ import Settings from './pages/Settings.jsx';
 import Suggested from './pages/Suggested.jsx';
 import Team from './pages/Team.jsx';
 import Integrations from './pages/Integrations.jsx';
+import Landing from './pages/Landing.jsx';
 
 export default function App() {
   return (
     <EventProvider>
       <Router>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/faq" element={<FAQManager />} />
-            <Route path="/activity" element={<Activity />} />
-            <Route path="/team" element={<Team />} />
-            <Route path="/integrations" element={<Integrations />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/suggested" element={<Suggested />} />
-            <Route path="*" element={<div className="text-center py-20 text-slate-500">404 - Page not found</div>} />
-          </Routes>
-        </Layout>
+        <Routes>
+          {/* Public Landing route without Layout (no sidebar) */}
+          <Route path="/" element={<Landing />} />
+
+          {/* Protected routes wrapped in Layout */}
+          <Route
+            path="/*"
+            element={
+              <Layout>
+                <Routes>
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/faq" element={<FAQManager />} />
+                  <Route path="/activity" element={<Activity />} />
+                  <Route path="/team" element={<Team />} />
+                  <Route path="/integrations" element={<Integrations />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/suggested" element={<Suggested />} />
+                  <Route path="*" element={<div className="text-center py-20 text-slate-500">404 - Page not found</div>} />
+                </Routes>
+              </Layout>
+            }
+          />
+        </Routes>
         <Toaster position="bottom-right" toastOptions={{
           className: 'bg-slate-800 text-white border border-slate-700',
           style: { background: '#1e293b', color: '#fff' }
