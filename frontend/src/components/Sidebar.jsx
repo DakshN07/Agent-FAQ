@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   MessageSquare,
@@ -10,7 +10,8 @@ import {
   ChevronRight,
   Plus,
   Users,
-  Link2
+  Link2,
+  LogOut
 } from 'lucide-react';
 import { useEvent } from '../contexts/EventContext';
 import CreateEventModal from './CreateEventModal';
@@ -36,6 +37,12 @@ const Sidebar = () => {
   const isActive = (path) => location.pathname === path;
   const { events, activeEvent, selectEvent } = useEvent();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    navigate('/');
+  };
 
   return (
     <>
@@ -127,17 +134,25 @@ const Sidebar = () => {
         </div>
 
         {/* Footer */}
-        <div className="mt-auto p-6 border-t border-slate-800/50">
-          <div className="flex items-center space-x-3 p-3 rounded-xl bg-slate-800/30 border border-slate-700/50 hover:bg-slate-800/50 transition-colors cursor-pointer group">
+        <div className="mt-auto p-6 border-t border-slate-800/50 flex items-center justify-between">
+          <div className="flex items-center space-x-3 p-3 rounded-xl bg-slate-800/30 border border-slate-700/50 hover:bg-slate-800/50 transition-colors cursor-pointer group flex-1">
             <div className="w-10 h-10 rounded-full bg-gradient-to-r from-slate-700 to-slate-600 flex items-center justify-center text-sm font-bold text-white border-2 border-slate-700 group-hover:border-primary-500/50 transition-colors">
-              AD
+              U
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-200 truncate">Admin User</p>
-              <p className="text-xs text-slate-500 truncate">Pro Plan</p>
+              <p className="text-sm font-medium text-slate-200 truncate">Agent User</p>
+              <p className="text-xs text-slate-500 truncate">Manager</p>
             </div>
             <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-slate-400" />
           </div>
+
+          <button
+            onClick={handleLogout}
+            title="Log Out / Go Home"
+            className="ml-3 p-3 rounded-xl bg-slate-800/30 border border-slate-700/50 hover:bg-red-500/20 hover:border-red-500/30 hover:text-red-400 text-slate-400 transition-colors"
+          >
+            <LogOut className="w-5 h-5" />
+          </button>
         </div>
       </aside>
       <CreateEventModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} />

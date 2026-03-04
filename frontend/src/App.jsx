@@ -13,31 +13,45 @@ import Suggested from './pages/Suggested.jsx';
 import Team from './pages/Team.jsx';
 import Integrations from './pages/Integrations.jsx';
 import Landing from './pages/Landing.jsx';
+import Login from './pages/Login.jsx';
+import Register from './pages/Register.jsx';
+
+const ProtectedRoute = ({ children }) => {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+};
 
 export default function App() {
   return (
     <EventProvider>
       <Router>
         <Routes>
-          {/* Public Landing route without Layout (no sidebar) */}
+          {/* Public Routes without Layout */}
           <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
 
           {/* Protected routes wrapped in Layout */}
           <Route
             path="/*"
             element={
-              <Layout>
-                <Routes>
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/faq" element={<FAQManager />} />
-                  <Route path="/activity" element={<Activity />} />
-                  <Route path="/team" element={<Team />} />
-                  <Route path="/integrations" element={<Integrations />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/suggested" element={<Suggested />} />
-                  <Route path="*" element={<div className="text-center py-20 text-slate-500">404 - Page not found</div>} />
-                </Routes>
-              </Layout>
+              <ProtectedRoute>
+                <Layout>
+                  <Routes>
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/faq" element={<FAQManager />} />
+                    <Route path="/activity" element={<Activity />} />
+                    <Route path="/team" element={<Team />} />
+                    <Route path="/integrations" element={<Integrations />} />
+                    <Route path="/settings" element={<Settings />} />
+                    <Route path="/suggested" element={<Suggested />} />
+                    <Route path="*" element={<div className="text-center py-20 text-slate-500">404 - Page not found</div>} />
+                  </Routes>
+                </Layout>
+              </ProtectedRoute>
             }
           />
         </Routes>
