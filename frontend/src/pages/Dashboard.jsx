@@ -8,22 +8,52 @@ import {
   TrendingUp,
   ArrowUpRight,
   ArrowDownRight,
-  Activity
+  Activity,
+  Plus
 } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useEvent } from '../contexts/EventContext';
+import CreateEventModal from '../components/CreateEventModal';
+import JoinEventModal from '../components/JoinEventModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const Dashboard = () => {
-  const { activeEvent } = useEvent();
+  const { events, activeEvent, loading: contextLoading, refreshEvents } = useEvent();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const location = useLocation();
+
+  // Empty state handling
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
+  const [joinCode, setJoinCode] = useState('');
+  const [joining, setJoining] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (location.state?.action) {
+      if (location.state.action === 'create') {
+        setIsCreateModalOpen(true);
+      } else if (location.state.action === 'join') {
+        setIsJoinModalOpen(true);
+      }
+      // Clear state so it doesn't re-trigger on unmount/remount
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location, navigate]);
 
   useEffect(() => {
     async function fetchStats() {
-      if (!activeEvent) return;
+      if (!activeEvent) {
+        setLoading(false);
+        return;
+      }
       try {
-        const res = await fetch(`${API_URL}/api/analytics?eventId=${activeEvent._id}`);
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${API_URL}/api/analytics?eventId=${activeEvent._id}`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
         if (!res.ok) throw new Error('Network response was not ok');
         const data = await res.json();
         setStats(data);
@@ -34,7 +64,33 @@ const Dashboard = () => {
       }
     }
     fetchStats();
-  }, []);
+  }, [activeEvent]);
+
+  const handleJoinTeam = async (e) => {
+    e.preventDefault();
+    if (!joinCode.trim()) return;
+    setJoining(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/api/events/join`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ inviteCode: joinCode })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      await refreshEvents();
+      // Optional: show toast success
+    } catch (err) {
+      console.error(err.message);
+      // Optional: show toast error
+    } finally {
+      setJoining(false);
+    }
+  };
 
   const chartData = stats?.chartData || [
     { name: 'Mon', queries: 0 },
@@ -66,6 +122,48 @@ const Dashboard = () => {
       </div>
     </div>
   );
+
+  if (contextLoading || (loading && activeEvent)) {
+    return <div className="flex items-center justify-center min-h-[50vh]"><span className="text-slate-400">Loading Dashboard...</span></div>;
+  }
+
+  if (!activeEvent || events.length === 0) {
+    return (
+      <div className="max-w-4xl mx-auto py-12 px-4 animate-fade-in text-center">
+        <h2 className="text-4xl font-extrabold text-white tracking-tight mb-4">Welcome to AgentFAQ Workspace</h2>
+        <p className="text-lg text-slate-400 mb-12 max-w-2xl mx-auto">Get started by creating a new event workspace or joining an existing one with an invite code.</p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Create Event Block */}
+          <div className="bg-slate-800/50 p-8 rounded-3xl border border-slate-700/50 shadow-lg text-left hover:border-primary-500/50 transition-colors">
+            <div className="w-12 h-12 rounded-2xl bg-primary-500/20 text-primary-400 flex items-center justify-center mb-6">
+              <Plus className="w-6 h-6" />
+            </div>
+            <h3 className="text-2xl font-bold text-white mb-2">Create New Event</h3>
+            <p className="text-slate-400 text-sm mb-8">Setup a new AI Assistant workspace from scratch. Generate your first FAQs automatically.</p>
+            <button onClick={() => setIsCreateModalOpen(true)} className="w-full btn-primary bg-primary-600 hover:bg-primary-500">
+              Create Event Sandbox
+            </button>
+          </div>
+
+          {/* Join Event Block */}
+          <div className="bg-slate-800/50 p-8 rounded-3xl border border-slate-700/50 shadow-lg text-left hover:border-indigo-500/50 transition-colors">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center mb-6">
+              <Users className="w-6 h-6" />
+            </div>
+            <h3 className="text-2xl font-bold text-white mb-2">Join a Team</h3>
+            <p className="text-slate-400 text-sm mb-6">Enter your 6-digit access code provided by the event organizer.</p>
+            <button onClick={() => setIsJoinModalOpen(true)} className="w-full btn-primary bg-indigo-600 hover:bg-indigo-500 mt-2">
+              Enter Access Code
+            </button>
+          </div>
+        </div>
+
+        <CreateEventModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} />
+        <JoinEventModal isOpen={isJoinModalOpen} onClose={() => setIsJoinModalOpen(false)} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-fade-in max-w-7xl mx-auto">
@@ -219,11 +317,13 @@ const Dashboard = () => {
               <div className="text-sm text-slate-500 text-center mt-10">No recent questions!</div>
             )}
           </div>
-          <button className="w-full mt-6 py-3 text-sm font-medium text-slate-300 bg-slate-700/50 rounded-xl hover:bg-slate-700 transition-colors flex items-center justify-center border border-slate-700">
+          <button onClick={() => window.location.href = '/activity'} className="w-full mt-6 py-3 text-sm font-medium text-slate-300 bg-slate-700/50 rounded-xl hover:bg-slate-700 transition-colors flex items-center justify-center border border-slate-700">
             View All History <ArrowUpRight className="w-4 h-4 ml-2" />
           </button>
         </div>
       </div>
+      <CreateEventModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} />
+      <JoinEventModal isOpen={isJoinModalOpen} onClose={() => setIsJoinModalOpen(false)} />
     </div>
   );
 };

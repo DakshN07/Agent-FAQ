@@ -67,13 +67,13 @@ const Landing = () => {
             <div className="absolute inset-0 z-0">
                 <div className="absolute inset-0 bg-[#0f172a]/80 animate-fade-in z-10 backdrop-blur-[2px]"></div>
                 {/* Simulated running chats effect */}
-                <div className="absolute w-full h-full opacity-10 overflow-hidden pointer-events-none flex flex-col select-none">
+                <div className="absolute w-full h-full opacity-65 overflow-hidden pointer-events-none flex flex-col select-none">
                     {[...Array(20)].map((_, i) => (
-                        <div key={i} className={`flex items-center space-x-4 mb-4 whitespace-nowrap animate-slide-left`} style={{ animationDuration: `${20 + Math.random() * 20}s`, animationDelay: `${-Math.random() * 10}s` }}>
-                            <span className="text-sm font-mono text-primary-500">USER_{Math.floor(Math.random() * 1000)}:</span>
-                            <span className="text-sm text-slate-300">Where is the event being held?</span>
-                            <span className="text-sm font-mono text-emerald-500 ml-8">BOT:</span>
-                            <span className="text-sm text-slate-300">The main stage is at Hall {Math.floor(Math.random() * 10)}!</span>
+                        <div key={i} className={`flex items-center space-x-6 mb-8 whitespace-nowrap animate-slide-left`} style={{ animationDuration: `${20 + Math.random() * 20}s`, animationDelay: `${-Math.random() * 10}s` }}>
+                            <span className="text-lg font-mono text-primary-500">USER_{Math.floor(Math.random() * 1000)}:</span>
+                            <span className="text-lg text-slate-200 font-medium tracking-wide">Where is the event being held?</span>
+                            <span className="text-lg font-mono text-emerald-500 ml-12">BOT:</span>
+                            <span className="text-lg text-slate-200 font-medium tracking-wide">The main stage is at Hall {Math.floor(Math.random() * 10)}!</span>
                         </div>
                     ))}
                 </div>
@@ -102,7 +102,7 @@ const Landing = () => {
 
                     {/* Create Event Card */}
                     <div
-                        onClick={() => navigate('/dashboard')}
+                        onClick={() => navigate('/dashboard', { state: { action: 'create' } })}
                         className="group relative p-8 rounded-3xl bg-slate-800/50 border border-slate-700/50 hover:border-primary-500/50 hover:bg-slate-800/80 transition-all duration-300 cursor-pointer overflow-hidden text-left"
                     >
                         <div className="absolute inset-0 bg-gradient-to-br from-primary-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -120,7 +120,7 @@ const Landing = () => {
 
                     {/* Join Team Card */}
                     <div
-                        onClick={() => navigate('/dashboard')}
+                        onClick={() => navigate('/dashboard', { state: { action: 'join' } })}
                         className="group relative p-8 rounded-3xl bg-slate-800/50 border border-slate-700/50 hover:border-indigo-500/50 hover:bg-slate-800/80 transition-all duration-300 cursor-pointer overflow-hidden text-left"
                     >
                         <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />

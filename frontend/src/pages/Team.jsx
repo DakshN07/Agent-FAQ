@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Shield, UserPlus, Trash2, Edit2, AlertCircle, X, Check } from 'lucide-react';
+import { Users, Shield, UserPlus, Trash2, Edit2, AlertCircle, X, Check, Copy } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useEvent } from '../contexts/EventContext';
 
@@ -119,8 +119,31 @@ const TeamManager = () => {
                     className="btn-primary flex items-center"
                 >
                     <UserPlus className="w-5 h-5 mr-2" />
-                    Invite Member
+                    Invite by Email
                 </button>
+            </div>
+
+            <div className="bg-indigo-500/10 border border-indigo-500/30 p-4 rounded-xl flex items-center justify-between">
+                <div>
+                    <h4 className="text-white font-medium">Team Invite Code</h4>
+                    <p className="text-sm text-indigo-300">Share this 6-digit code with team members so they can join instantly from the dashboard.</p>
+                </div>
+                <div className="flex items-center space-x-3">
+                    <code className="px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-lg font-mono tracking-widest text-white">
+                        {activeEvent.inviteCode || 'N/A'}
+                    </code>
+                    <button
+                        onClick={() => {
+                            if (activeEvent.inviteCode) {
+                                navigator.clipboard.writeText(activeEvent.inviteCode);
+                                toast.success('Copied to clipboard!');
+                            }
+                        }}
+                        className="p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors"
+                    >
+                        <Copy className="w-5 h-5" />
+                    </button>
+                </div>
             </div>
 
             <div className="bg-slate-800/50 rounded-2xl border border-slate-700/50 shadow-lg backdrop-blur-sm overflow-hidden">
