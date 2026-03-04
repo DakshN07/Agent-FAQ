@@ -1,22 +1,41 @@
 const express = require('express');
 const router = express.Router();
 const Event = require('../models/Event');
+const Faq = require('../models/Faq');
 const { authenticate } = require('../middleware/auth');
+const { generateOnboardingFAQs } = require('../services/ai');
 
 // Create event
 router.post('/', authenticate, async (req, res) => {
     try {
-        const { name, description, faqThreshold } = req.body;
+        const { name, description, generateFAQs, faqThreshold } = req.body;
         const newEvent = new Event({
             name,
             description,
-            managerId: req.user.id, // req.user set by auth middleware
+            managerId: req.user.id,
             faqThreshold
         });
         await newEvent.save();
-        res.status(201).json(newEvent);
+
+        let generatedPrompts = [];
+        if (generateFAQs !== false) {
+            generatedPrompts = await generateOnboardingFAQs(name, description);
+
+            // Auto save generated prompts
+            if (generatedPrompts && generatedPrompts.length > 0) {
+                const faqDocs = generatedPrompts.map(p => ({
+                    eventId: newEvent._id,
+                    question: p.question,
+                    answer: p.answer,
+                    platforms: ['discord', 'slack', 'whatsapp']
+                }));
+                await Faq.insertMany(faqDocs);
+            }
+        }
+
+        res.status(201).json({ event: newEvent, aiPrompts: generatedPrompts });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(400).json({ error: error.message });
     }
 });
 

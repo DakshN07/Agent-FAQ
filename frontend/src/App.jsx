@@ -10,6 +10,8 @@ import FAQManager from './pages/FAQManager.jsx';
 import Activity from './pages/Activity.jsx';
 import Settings from './pages/Settings.jsx';
 import Suggested from './pages/Suggested.jsx';
+import Team from './pages/Team.jsx';
+import Integrations from './pages/Integrations.jsx';
 
 export default function App() {
   return (
@@ -21,6 +23,8 @@ export default function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/faq" element={<FAQManager />} />
             <Route path="/activity" element={<Activity />} />
+            <Route path="/team" element={<Team />} />
+            <Route path="/integrations" element={<Integrations />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/suggested" element={<Suggested />} />
             <Route path="*" element={<div className="text-center py-20 text-slate-500">404 - Page not found</div>} />

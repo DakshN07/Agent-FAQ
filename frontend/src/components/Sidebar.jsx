@@ -8,7 +8,9 @@ import {
   Lightbulb,
   Zap,
   ChevronRight,
-  Plus
+  Plus,
+  Users,
+  Link2
 } from 'lucide-react';
 import { useEvent } from '../contexts/EventContext';
 import CreateEventModal from './CreateEventModal';
@@ -16,13 +18,13 @@ import CreateEventModal from './CreateEventModal';
 const NavItem = ({ to, icon: Icon, label, active }) => (
   <Link
     to={to}
-    className={`flex items-center justify-between px-4 py-3.5 rounded-xl transition-all duration-300 group ${active
+    className={`flex items - center justify - between px - 4 py - 3.5 rounded - xl transition - all duration - 300 group ${active
       ? 'bg-primary-600/10 text-primary-600 font-medium'
       : 'text-slate-500 hover:bg-slate-800/50 hover:text-slate-200'
-      }`}
+      } `}
   >
     <div className="flex items-center space-x-3">
-      <Icon className={`w-5 h-5 transition-colors ${active ? 'text-primary-500' : 'text-slate-500 group-hover:text-slate-300'}`} />
+      <Icon className={`w - 5 h - 5 transition - colors ${active ? 'text-primary-500' : 'text-slate-500 group-hover:text-slate-300'} `} />
       <span>{label}</span>
     </div>
     {active && <div className="w-1.5 h-1.5 rounded-full bg-primary-500 shadow-lg shadow-primary-500/50"></div>}
@@ -102,6 +104,18 @@ const Sidebar = () => {
               active={isActive('/suggested')}
               label="Insights"
               icon={Lightbulb}
+            />
+            <NavItem
+              to="/team"
+              active={isActive('/team')}
+              label="Team Access"
+              icon={Users}
+            />
+            <NavItem
+              to="/integrations"
+              active={isActive('/integrations')}
+              label="Integrations"
+              icon={Link2}
             />
             <NavItem
               to="/settings"

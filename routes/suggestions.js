@@ -1,11 +1,15 @@
 const express = require('express');
-const router = express.Router();
-const storage = require('../utils/storage');
+const router = express.Router({ mergeParams: true });
+const UnknownQuestion = require('../models/UnknownQuestion');
+const { authenticate } = require('../middleware/auth');
 
-// Simple suggestions based on unknown questions
-router.get('/', async (req, res) => {
+// Simple suggestions based on unknown questions per event
+router.get('/', authenticate, async (req, res) => {
   try {
-    const unknowns = await storage.getUnknownQuestions();
+    const eventId = req.query.eventId;
+    if (!eventId) return res.status(400).json({ error: 'eventId required' });
+
+    const unknowns = await UnknownQuestion.find({ eventId });
 
     // Simple logic: if asked > 1 times, suggest it
     const suggestions = unknowns

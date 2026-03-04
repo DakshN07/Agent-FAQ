@@ -117,6 +117,26 @@ const Dashboard = () => {
         />
       </div>
 
+      {/* Platform Breakdown */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+        <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 shadow-sm flex items-center justify-between col-span-1 md:col-start-1">
+          <span className="text-slate-400 font-medium">Discord API</span>
+          <span className="text-white font-bold">{stats?.perPlatform?.discord || 0} msgs</span>
+        </div>
+        <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 shadow-sm flex items-center justify-between">
+          <span className="text-slate-400 font-medium">Slack API</span>
+          <span className="text-white font-bold">{stats?.perPlatform?.slack || 0} msgs</span>
+        </div>
+        <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 shadow-sm flex items-center justify-between">
+          <span className="text-slate-400 font-medium">WhatsApp API</span>
+          <span className="text-white font-bold">{stats?.perPlatform?.whatsapp || 0} msgs</span>
+        </div>
+        <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 shadow-sm flex items-center justify-between">
+          <span className="text-slate-400 font-medium">Web / Manual</span>
+          <span className="text-white font-bold">{stats?.perPlatform?.web || 0} msgs</span>
+        </div>
+      </div>
+
       {/* Main Chart Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Activity Chart */}
@@ -180,21 +200,24 @@ const Dashboard = () => {
         <div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700/50 shadow-sm flex flex-col backdrop-blur-sm">
           <h3 className="text-lg font-bold text-white mb-6">Recent Live Feed</h3>
           <div className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar">
-            {[1, 2, 3, 4, 5].map((_, i) => (
+            {(stats?.pendingQuestions || []).slice(0, 5).map((q, i) => (
               <div key={i} className="flex items-start space-x-4 group">
                 <div className="w-8 h-8 rounded-full bg-slate-700/50 flex items-center justify-center border border-slate-700 group-hover:border-primary-500/50 transition-colors">
-                  <MessageCircle className="w-4 h-4 text-slate-400 group-hover:text-primary-400" />
+                  <HelpCircle className="w-4 h-4 text-slate-400 group-hover:text-primary-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-200 truncate group-hover:text-white transition-colors">How do I reset my password?</p>
+                  <p className="text-sm font-medium text-slate-200 truncate group-hover:text-white transition-colors">{q.question}</p>
                   <div className="flex items-center mt-1 space-x-2">
-                    <span className="text-xs text-slate-500">2 mins ago</span>
+                    <span className="text-xs text-slate-500 capitalize">{q.sourcePlatform || 'web'}</span>
                     <span className="w-1 h-1 rounded-full bg-slate-600"></span>
-                    <span className="text-xs font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">Matched</span>
+                    <span className="text-xs font-medium text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">Unanswered</span>
                   </div>
                 </div>
               </div>
             ))}
+            {(!stats?.pendingQuestions || stats.pendingQuestions.length === 0) && (
+              <div className="text-sm text-slate-500 text-center mt-10">No recent questions!</div>
+            )}
           </div>
           <button className="w-full mt-6 py-3 text-sm font-medium text-slate-300 bg-slate-700/50 rounded-xl hover:bg-slate-700 transition-colors flex items-center justify-center border border-slate-700">
             View All History <ArrowUpRight className="w-4 h-4 ml-2" />

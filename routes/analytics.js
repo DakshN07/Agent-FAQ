@@ -15,20 +15,31 @@ router.get('/', async (req, res) => {
 
         // Sum matched and unmatched from Analytics table
         const analytics = await Analytics.find(query);
-        const matched = analytics.reduce((sum, a) => sum + (a.matched || 0), 0);
-        const unmatched = analytics.reduce((sum, a) => sum + (a.unmatched || 0), 0);
-        const totalQueries = matched + unmatched;
+        let matched = 0;
+        let totalQueries = 0;
+        let perPlatform = { discord: 0, slack: 0, whatsapp: 0, web: 0 };
 
-        // Get top unknown questions
-        const pendingQuestions = await UnknownQuestion.find(query)
+        for (const a of analytics) {
+            matched += (a.matchedQueries || 0);
+            totalQueries += (a.totalQueries || 0);
+
+            const plat = a.platform || 'web';
+            if (!perPlatform[plat]) perPlatform[plat] = 0;
+            perPlatform[plat] += (a.totalQueries || 0);
+        }
+        const unmatched = totalQueries - matched;
+
+        // Get top unknown questions (Note: The .map logic was broken, fixing it)
+        const pendingQuestionsArray = await UnknownQuestion.find(query)
             .sort({ count: -1 })
-            .limit(10)
-            .map(items => items.map(q => ({
-                question: q.text,
-                count: q.count,
-                eventId: q.eventId,
-                sourcePlatform: q.sourcePlatform
-            })));
+            .limit(10);
+
+        const pendingQuestions = pendingQuestionsArray.map(q => ({
+            question: q.text,
+            count: q.count,
+            eventId: q.eventId,
+            sourcePlatform: q.sourcePlatform
+        }));
 
         // Placeholder chart data
         const chartData = [
@@ -47,6 +58,7 @@ router.get('/', async (req, res) => {
             matched,
             unmatched,
             totalQueries,
+            perPlatform,
             uniqueUsers: 0,
             accuracy: totalQueries > 0 ? ((matched / totalQueries) * 100).toFixed(2) : 0,
             chartData,

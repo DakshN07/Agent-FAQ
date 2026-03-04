@@ -13,6 +13,7 @@ app.use(express.json());
 // Import Routes
 const routes = require('./routes/index');
 const authRoutes = require('./routes/auth'); // Auth routes might be separate or part of index
+const integrationManager = require('./services/IntegrationManager');
 
 // Connect to MongoDB
 const connectDB = async () => {
@@ -20,6 +21,9 @@ const connectDB = async () => {
     const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/agent-faq';
     await mongoose.connect(mongoUri);
     console.log(`✅ MongoDB Connected`);
+
+    // Load integrations after successful DB connection
+    await integrationManager.loadIntegrations();
   } catch (err) {
     console.error(`❌ MongoDB Connection Error: ${err.message}`);
     // Non-blocking for now, let it run even if mongo fails initially

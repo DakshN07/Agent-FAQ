@@ -4,21 +4,23 @@ const Integration = require('../models/Integration');
 const Event = require('../models/Event');
 const { authenticate } = require('../middleware/auth');
 
-// Middleware to check event ownership
-const checkEventOwnership = async (req, res, next) => {
+// Middleware to check event access (abstracted for brevity; assuming only manager/admin can configure)
+const checkEventAdmin = async (req, res, next) => {
     try {
-        const event = await Event.findOne({ _id: req.params.eventId, managerId: req.user.id });
-        if (!event) return res.status(404).json({ error: 'Event not found or unauthorized' });
-        req.event = event;
+        const event = await Event.findById(req.params.eventId);
+        if (!event) return res.status(404).json({ error: 'Event not found' });
+        if (event.managerId.toString() !== req.user.id.toString()) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
         next();
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 };
 
-router.use(authenticate, checkEventOwnership);
+router.use(authenticate, checkEventAdmin);
 
-// Get integrations for event
+// Get integrations for an event
 router.get('/', async (req, res) => {
     try {
         const integrations = await Integration.find({ eventId: req.params.eventId });
@@ -28,46 +30,30 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Add integration
+// Configure an integration (Create or Update)
 router.post('/', async (req, res) => {
     try {
-        const { platform, credentials, channelMappings } = req.body;
-        const integration = new Integration({
-            eventId: req.params.eventId,
-            platform,
-            credentials,
-            channelMappings
-        });
-        await integration.save();
-        res.status(201).json(integration);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
+        const { platform, credentials, isActive } = req.body;
 
-// Update integration
-router.put('/:platform', async (req, res) => {
-    try {
-        const integration = await Integration.findOneAndUpdate(
-            { eventId: req.params.eventId, platform: req.params.platform },
-            { $set: req.body },
-            { new: true }
-        );
-        if (!integration) return res.status(404).json({ error: 'Integration not found' });
+        // Find existing or create new
+        let integration = await Integration.findOne({ eventId: req.params.eventId, platform });
+
+        if (integration) {
+            integration.credentials = credentials;
+            integration.isActive = isActive !== undefined ? isActive : integration.isActive;
+        } else {
+            integration = new Integration({
+                eventId: req.params.eventId,
+                platform,
+                credentials,
+                isActive
+            });
+        }
+
+        await integration.save();
         res.json(integration);
     } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Delete integration
-router.delete('/:platform', async (req, res) => {
-    try {
-        const integration = await Integration.findOneAndDelete({ eventId: req.params.eventId, platform: req.params.platform });
-        if (!integration) return res.status(404).json({ error: 'Integration not found' });
-        res.json({ message: 'Integration deleted successfully' });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(400).json({ error: error.message });
     }
 });
 
