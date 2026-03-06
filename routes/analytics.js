@@ -7,7 +7,10 @@ const Faq = require('../models/Faq');
 router.get('/', async (req, res) => {
     try {
         const eventId = req.query.eventId;
-        const query = eventId && eventId !== 'undefined' ? { eventId } : {};
+        if (!eventId || eventId === 'undefined') {
+            return res.status(400).json({ error: 'eventId is required' });
+        }
+        const query = { eventId };
 
         // Aggregate stats
         const faqsCount = await Faq.countDocuments(query);

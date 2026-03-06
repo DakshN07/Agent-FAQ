@@ -9,8 +9,8 @@ const Landing = () => {
 
     useEffect(() => {
         // Sequence the splash animation
-        const timer1 = setTimeout(() => setAnimatingLogos(true), 1000); // Start logo squeeze
-        const timer2 = setTimeout(() => setShowSplash(false), 3500); // End splash
+        const timer1 = setTimeout(() => setAnimatingLogos(true), 1500); // Start fade out
+        const timer2 = setTimeout(() => setShowSplash(false), 2500); // End splash
 
         return () => {
             clearTimeout(timer1);
@@ -20,40 +20,12 @@ const Landing = () => {
 
     if (showSplash) {
         return (
-            <div className="fixed inset-0 bg-[#0f172a] z-50 flex items-center justify-center overflow-hidden">
-                <div className="relative w-full max-w-lg h-96 flex items-center justify-center">
-
-                    {/* Main AgentFAQ Box */}
-                    <div className={`absolute z-20 flex flex-col items-center justify-center w-48 h-48 border-2 border-primary-500/30 rounded-3xl bg-slate-900/80 backdrop-blur-xl shadow-[0_0_50px_rgba(56,189,248,0.2)] transition-all duration-1000 ${animatingLogos ? 'scale-110 shadow-[0_0_100px_rgba(56,189,248,0.4)]' : 'scale-90 opacity-0 animate-fade-in'}`}>
-                        <Box className="w-12 h-12 text-primary-400 mb-2" />
-                        <span className="text-2xl font-bold bg-gradient-to-r from-primary-400 to-indigo-400 bg-clip-text text-transparent">AgentFAQ</span>
-                    </div>
-
-                    {/* Platform Logos Squeezing In */}
-                    <div className={`absolute transition-all duration-1000 ${animatingLogos ? 'translate-x-0 translate-y-0 opacity-0 scale-50' : '-translate-x-32 -translate-y-32 opacity-100 scale-100'}`}>
-                        <div className="w-16 h-16 rounded-2xl bg-[#5865F2] flex items-center justify-center shadow-lg shadow-[#5865F2]/20">
-                            <span className="text-white font-bold text-xl">D</span>
-                        </div>
-                    </div>
-
-                    <div className={`absolute transition-all duration-1000 ${animatingLogos ? 'translate-x-0 translate-y-0 opacity-0 scale-50' : 'translate-x-32 -translate-y-32 opacity-100 scale-100'}`}>
-                        <div className="w-16 h-16 rounded-2xl bg-[#E01E5A] flex items-center justify-center shadow-lg shadow-[#E01E5A]/20">
-                            <span className="text-white font-bold text-xl">S</span>
-                        </div>
-                    </div>
-
-                    <div className={`absolute transition-all duration-1000 delay-100 ${animatingLogos ? 'translate-x-0 translate-y-0 opacity-0 scale-50' : '-translate-x-32 translate-y-32 opacity-100 scale-100'}`}>
-                        <div className="w-16 h-16 rounded-2xl bg-[#25D366] flex items-center justify-center shadow-lg shadow-[#25D366]/20">
-                            <span className="text-white font-bold text-xl">W</span>
-                        </div>
-                    </div>
-
-                    <div className={`absolute transition-all duration-1000 delay-100 ${animatingLogos ? 'translate-x-0 translate-y-0 opacity-0 scale-50' : 'translate-x-32 translate-y-32 opacity-100 scale-100'}`}>
-                        <div className="w-16 h-16 rounded-2xl bg-[#229ED9] flex items-center justify-center shadow-lg shadow-[#229ED9]/20">
-                            <span className="text-white font-bold text-xl">T</span>
-                        </div>
-                    </div>
-
+            <div className={`fixed inset-0 bg-[#f8fafc] z-50 flex items-center justify-center overflow-hidden transition-opacity duration-1000 ${animatingLogos ? 'opacity-0' : 'opacity-100'}`}>
+                <div className="flex flex-col items-center justify-center animate-fade-in-up">
+                    <img src="/logo.png" alt="FAQ Agent Logo" className="w-48 md:w-64 h-auto drop-shadow-2xl animate-pulse-slow" />
+                    <h2 className="mt-8 text-4xl md:text-5xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600 drop-shadow-sm font-sans text-center">
+                        Event? Done!
+                    </h2>
                 </div>
             </div>
         );

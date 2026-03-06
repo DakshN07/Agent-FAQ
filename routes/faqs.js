@@ -6,8 +6,11 @@ const { getEmbedding } = require('../services/embedding');
 // GET all FAQs for an event
 router.get('/', async (req, res) => {
     try {
-        const query = req.query.eventId && req.query.eventId !== 'undefined' ? { eventId: req.query.eventId } : {};
-        const faqs = await Faq.find(query).sort({ _id: -1 });
+        const eventId = req.query.eventId;
+        if (!eventId || eventId === 'undefined') {
+            return res.status(400).json({ error: 'eventId is required' });
+        }
+        const faqs = await Faq.find({ eventId }).sort({ _id: -1 });
         res.json(faqs);
     } catch (error) {
         res.status(500).json({ error: error.message });

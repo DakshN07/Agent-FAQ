@@ -26,6 +26,11 @@ const faqSchema = new mongoose.Schema({
     type: [Number],
     required: false,
   },
+  answeredBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: false
+  }
 });
 
 module.exports = mongoose.models.Faq || mongoose.model('Faq', faqSchema);

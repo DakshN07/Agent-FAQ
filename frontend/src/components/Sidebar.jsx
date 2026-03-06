@@ -50,11 +50,11 @@ const Sidebar = () => {
         {/* Header */}
         <div className="p-6 pb-2">
           <div className="flex items-center space-x-3 mb-10 px-2 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-primary-500 to-violet-600 flex items-center justify-center shadow-lg shadow-primary-500/20 ring-1 ring-white/10 shrink-0">
-              <Zap className="w-6 h-6 text-white" fill="currentColor" />
+            <div className="w-10 h-10 shrink-0">
+              <img src="/logo.png" alt="AgentFAQ Logo" className="w-full h-full object-contain" />
             </div>
             <div className="flex-1 min-w-0 pr-2">
-              <h1 className="text-xl font-bold text-white tracking-tight truncate">
+              <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent tracking-tight truncate">
                 Agent FAQ
               </h1>
               <div className="flex items-center space-x-2 mt-1">

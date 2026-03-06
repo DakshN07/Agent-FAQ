@@ -1,30 +1,92 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { Save, RefreshCw, Bell, Sliders, Globe } from 'lucide-react';
+import { Save, Sliders, Globe, AlignLeft, LayoutTemplate } from 'lucide-react';
+import { useEvent } from '../contexts/EventContext';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const Settings = () => {
-    const [settings, setSettings] = useState({
-        similarityThreshold: 0.85,
-        adminNotifications: true,
-        theme: 'dark'
-    });
+    const { activeEvent, refreshEvents } = useEvent();
+    const [name, setName] = useState('');
+    const [description, setDescription] = useState('');
+    const [faqThreshold, setFaqThreshold] = useState(0.85);
+    const [saving, setSaving] = useState(false);
 
-    const handleSave = () => {
-        // Just mock save for now since auth is disabled
-        toast.success("Settings saved successfully");
+    useEffect(() => {
+        if (activeEvent) {
+            setName(activeEvent.name || '');
+            setDescription(activeEvent.description || '');
+            setFaqThreshold(activeEvent.faqThreshold || 0.85);
+        }
+    }, [activeEvent]);
+
+    const handleSave = async () => {
+        if (!activeEvent) return;
+        setSaving(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_URL}/api/events/${activeEvent._id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({ name, description, faqThreshold })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to update settings');
+
+            toast.success("Settings saved successfully");
+            await refreshEvents(); // Refresh context to reflect new name across app
+        } catch (err) {
+            toast.error(err.message);
+        } finally {
+            setSaving(false);
+        }
     };
+
+    if (!activeEvent) return <div className="text-slate-400">Loading settings...</div>;
 
     return (
         <div className="space-y-8 animate-fade-in max-w-4xl mx-auto">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-3xl font-bold text-white tracking-tight">Settings</h2>
-                    <p className="text-slate-400 mt-2">Configure behavior and preferences.</p>
+                    <h2 className="text-3xl font-bold text-white tracking-tight">Workspace Settings</h2>
+                    <p className="text-slate-400 mt-2">Configure behavior and preferences for <span className="text-white font-medium">{activeEvent.name}</span>.</p>
                 </div>
-                <button onClick={handleSave} className="btn-primary">
+                <button onClick={handleSave} disabled={saving} className="btn-primary disabled:opacity-50">
                     <Save className="w-4 h-4 mr-2" />
-                    Save Changes
+                    {saving ? 'Saving...' : 'Save Changes'}
                 </button>
+            </div>
+
+            {/* General Info */}
+            <div className="card-dark p-8">
+                <h3 className="text-xl font-bold text-white mb-6 flex items-center">
+                    <LayoutTemplate className="w-5 h-5 mr-3 text-indigo-500" />
+                    General Information
+                </h3>
+
+                <div className="space-y-6">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-400 mb-2">Workspace / Event Name</label>
+                        <input
+                            type="text"
+                            value={name}
+                            onChange={e => setName(e.target.value)}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-primary-500 outline-none"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-400 mb-2">Description</label>
+                        <textarea
+                            value={description}
+                            onChange={e => setDescription(e.target.value)}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white h-24 resize-none focus:ring-2 focus:ring-primary-500 outline-none"
+                            placeholder="Brief description of the event..."
+                        />
+                    </div>
+                </div>
             </div>
 
             {/* AI Settings */}
@@ -37,37 +99,18 @@ const Settings = () => {
                 <div className="space-y-6">
                     <div>
                         <div className="flex justify-between mb-2">
-                            <label className="text-sm font-medium text-slate-300">Similarity Threshold</label>
-                            <span className="text-primary-400 font-mono text-sm">{settings.similarityThreshold}</span>
+                            <label className="text-sm font-medium text-slate-300">Confidence Threshold</label>
+                            <span className="text-primary-400 font-mono text-sm">{faqThreshold.toFixed(2)}</span>
                         </div>
                         <input
                             type="range"
-                            min="0.5" max="1.0" step="0.05"
-                            value={settings.similarityThreshold}
-                            onChange={e => setSettings({ ...settings, similarityThreshold: parseFloat(e.target.value) })}
+                            min="0.5" max="0.95" step="0.01"
+                            value={faqThreshold}
+                            onChange={e => setFaqThreshold(parseFloat(e.target.value))}
                             className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary-500"
                         />
-                        <p className="text-xs text-slate-500 mt-2">Higher values require more precise matches. Lower values are more generous.</p>
+                        <p className="text-xs text-slate-500 mt-2">Determines how strict the AI is before auto-replying. A threshold of 0.85 requires an 85% match confidence. Lower values are more generous but may risk wrong answers.</p>
                     </div>
-                </div>
-            </div>
-
-            {/* Notifications */}
-            <div className="card-dark p-8">
-                <h3 className="text-xl font-bold text-white mb-6 flex items-center">
-                    <Bell className="w-5 h-5 mr-3 text-amber-500" />
-                    Notifications
-                </h3>
-
-                <div className="flex items-center justify-between">
-                    <div>
-                        <div className="text-slate-200 font-medium">Admin Alerts</div>
-                        <div className="text-slate-500 text-sm">Receive Discord DMs for repeated unknown questions.</div>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" checked={settings.adminNotifications} className="sr-only peer" onChange={() => { }} />
-                        <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-                    </label>
                 </div>
             </div>
         </div>

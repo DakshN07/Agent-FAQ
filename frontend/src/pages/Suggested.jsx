@@ -57,7 +57,7 @@ const Suggested = () => {
                         <h3 className="text-lg font-bold text-white mb-2">
                             "{s.question}"
                         </h3>
-                        <p className="text-slate-400 text-sm mb-6">Suggested based on 12 recent similar queries.</p>
+                        <p className="text-slate-400 text-sm mb-6">Suggested because {s.timesAsked} users asked this.</p>
 
                         <button className="w-full btn-secondary group-hover:bg-primary-600 group-hover:text-white group-hover:border-primary-600 transition-all">
                             <Plus className="w-4 h-4 mr-2" />

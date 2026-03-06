@@ -8,8 +8,11 @@ router.use(authenticate);
 // GET /
 router.get('/', async (req, res) => {
   try {
-    const query = req.query.eventId && req.query.eventId !== 'undefined' ? { eventId: req.query.eventId } : {};
-    const unknownQuestions = await UnknownQuestion.find(query).sort({ count: -1 });
+    const eventId = req.query.eventId;
+    if (!eventId || eventId === 'undefined') {
+      return res.status(400).json({ error: 'eventId is required' });
+    }
+    const unknownQuestions = await UnknownQuestion.find({ eventId }).sort({ count: -1 });
     res.json(unknownQuestions);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -34,7 +37,11 @@ router.post('/:id/answer', async (req, res) => {
     const integrationManager = require('../services/IntegrationManager');
     const adapter = integrationManager.getAdapter(unknown.eventId, unknown.sourcePlatform);
     if (adapter && unknown.channelId) {
-      await adapter.sendMessage(unknown.channelId, `*Answer from Organizer:*\n${answer}`);
+      try {
+        await adapter.sendMessage(unknown.channelId, `*Answer from Organizer:*\n${answer}`);
+      } catch (e) {
+        console.warn("Failed to broadcast back to platform", e.message);
+      }
     }
 
     // 2. Create FAQ
@@ -47,7 +54,8 @@ router.post('/:id/answer', async (req, res) => {
       question: unknown.text,
       answer: answer,
       embedding: embedding,
-      platforms: [unknown.sourcePlatform]
+      platforms: [unknown.sourcePlatform],
+      answeredBy: req.user.id
     });
     await newFaq.save();
 
