@@ -10,6 +10,7 @@ const eventsRouter = require('./events');
 const integrationsRouter = require('./integrations');
 const teamRouter = require('./team');
 const webhooksRouter = require('./webhooks');
+const oauthRouter = require('./oauth');
 
 router.use('/faqs', faqsRouter);
 router.use('/settings', settingsRouter);
@@ -21,6 +22,7 @@ eventsRouter.use('/:eventId/integrations', integrationsRouter);
 eventsRouter.use('/:eventId/team', teamRouter);
 
 router.use('/webhooks', webhooksRouter);
+router.use('/oauth', oauthRouter);
 
 router.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'FAQ Bot API is running' });

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { Save, Sliders, Globe, AlignLeft, LayoutTemplate } from 'lucide-react';
+import { Save, Sliders, Globe, AlignLeft, LayoutTemplate, Phone, Calendar, Link as LinkIcon, Instagram } from 'lucide-react';
 import { useEvent } from '../contexts/EventContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -10,6 +10,10 @@ const Settings = () => {
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [faqThreshold, setFaqThreshold] = useState(0.85);
+    const [instagramHandle, setInstagramHandle] = useState('');
+    const [websiteUrl, setWebsiteUrl] = useState('');
+    const [contactNumber, setContactNumber] = useState('');
+    const [appointmentLink, setAppointmentLink] = useState('');
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
@@ -17,6 +21,10 @@ const Settings = () => {
             setName(activeEvent.name || '');
             setDescription(activeEvent.description || '');
             setFaqThreshold(activeEvent.faqThreshold || 0.85);
+            setInstagramHandle(activeEvent.instagramHandle || '');
+            setWebsiteUrl(activeEvent.websiteUrl || '');
+            setContactNumber(activeEvent.contactNumber || '');
+            setAppointmentLink(activeEvent.appointmentLink || '');
         }
     }, [activeEvent]);
 
@@ -31,7 +39,7 @@ const Settings = () => {
                     'Content-Type': 'application/json',
                     ...(token ? { 'Authorization': `Bearer ${token}` } : {})
                 },
-                body: JSON.stringify({ name, description, faqThreshold })
+                body: JSON.stringify({ name, description, faqThreshold, instagramHandle, websiteUrl, contactNumber, appointmentLink })
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Failed to update settings');
@@ -85,6 +93,53 @@ const Settings = () => {
                             className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white h-24 resize-none focus:ring-2 focus:ring-primary-500 outline-none"
                             placeholder="Brief description of the event..."
                         />
+                    </div>
+                </div>
+            </div>
+
+            {/* Event Profile Links */}
+            <div className="card-dark p-8">
+                <h3 className="text-xl font-bold text-white mb-6 flex items-center">
+                    <Globe className="w-5 h-5 mr-3 text-emerald-500" />
+                    Public Profile & Links
+                </h3>
+                <p className="text-sm text-slate-400 mb-6">These details will be passed to the AI so it can accurately direct users to your resources.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-400 mb-2">Website URL</label>
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none border-r border-slate-700 pr-3">
+                                <LinkIcon className="h-4 w-4 text-slate-500" />
+                            </div>
+                            <input type="url" value={websiteUrl} onChange={e => setWebsiteUrl(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-lg py-3 pl-12 pr-3 text-white focus:ring-2 focus:ring-primary-500 outline-none" placeholder="https://example.com" />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-400 mb-2">Instagram Handle</label>
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none border-r border-slate-700 pr-3">
+                                <Instagram className="h-4 w-4 text-slate-500" />
+                            </div>
+                            <input type="text" value={instagramHandle} onChange={e => setInstagramHandle(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-lg py-3 pl-12 pr-3 text-white focus:ring-2 focus:ring-primary-500 outline-none" placeholder="@yourhandle" />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-400 mb-2">Contact Phone Number</label>
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none border-r border-slate-700 pr-3">
+                                <Phone className="h-4 w-4 text-slate-500" />
+                            </div>
+                            <input type="tel" value={contactNumber} onChange={e => setContactNumber(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-lg py-3 pl-12 pr-3 text-white focus:ring-2 focus:ring-primary-500 outline-none" placeholder="+1 (555) 000-0000" />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-400 mb-2">Booking / Appointment Link</label>
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none border-r border-slate-700 pr-3">
+                                <Calendar className="h-4 w-4 text-slate-500" />
+                            </div>
+                            <input type="url" value={appointmentLink} onChange={e => setAppointmentLink(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-lg py-3 pl-12 pr-3 text-white focus:ring-2 focus:ring-primary-500 outline-none" placeholder="https://calendly.com/your-event" />
+                        </div>
                     </div>
                 </div>
             </div>

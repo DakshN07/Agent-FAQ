@@ -1,7 +1,6 @@
 const Integration = require('../models/Integration');
 const DiscordAdapter = require('../adapters/DiscordAdapter');
 const SlackAdapter = require('../adapters/SlackAdapter');
-const WhatsappAdapter = require('../adapters/WhatsappAdapter');
 const TelegramAdapter = require('../adapters/TelegramAdapter');
 const { getEmbedding } = require('../services/embedding');
 const { cosineSimilarity } = require('../services/similarity');
@@ -37,13 +36,13 @@ class IntegrationManager {
         let adapterInstance;
         switch (integration.platform) {
             case 'discord':
-                adapterInstance = new DiscordAdapter(integration.eventId, {}, integration.credentials, this.handleIncomingMessage.bind(this));
+                adapterInstance = new DiscordAdapter(integration.eventId, {}, { token: process.env.DISCORD_TOKEN, ...integration.credentials }, this.handleIncomingMessage.bind(this));
                 break;
             case 'slack':
-                adapterInstance = new SlackAdapter(integration.eventId, {}, integration.credentials);
+                adapterInstance = new SlackAdapter(integration.eventId, {}, { token: integration.credentials?.access_token || integration.credentials?.token });
                 break;
-            case 'whatsapp':
-                adapterInstance = new WhatsappAdapter(integration.eventId, {}, integration.credentials);
+            case 'telegram':
+                adapterInstance = new TelegramAdapter(integration.eventId, {}, { token: process.env.TELEGRAM_BOT_TOKEN, ...integration.credentials }, this.handleIncomingMessage.bind(this));
                 break;
             default:
                 console.log(`[IntegrationManager] Unrecognized platform: ${integration.platform}`);

@@ -1,20 +1,52 @@
-import React, { useState, useEffect } from 'react';
-import { Save, CheckCircle2, AlertCircle, Info } from 'lucide-react';
-import toast from 'react-hot-toast';
+import React, { useState, useEffect, useRef } from 'react';
+import { Save, CheckCircle2, AlertCircle, Info, ExternalLink } from 'lucide-react';
+import toast, { useToaster } from 'react-hot-toast';
 import { useEvent } from '../contexts/EventContext';
+import { useLocation } from 'react-router-dom';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const TELEGRAM_BOT_NAME = import.meta.env.VITE_TELEGRAM_BOT_NAME || 'YourBotUsername_bot';
+
+// Helper component to render Telegram Widget safely
+const TelegramLoginWidget = ({ callbackUrl, state }) => {
+    const containerRef = useRef(null);
+
+    useEffect(() => {
+        if (!containerRef.current || containerRef.current.children.length > 0) return;
+        const script = document.createElement('script');
+        script.src = 'https://telegram.org/js/telegram-widget.js?22';
+        script.async = true;
+        script.setAttribute('data-telegram-login', TELEGRAM_BOT_NAME);
+        script.setAttribute('data-size', 'large');
+        script.setAttribute('data-auth-url', `${callbackUrl}?state=${state}`);
+        script.setAttribute('data-request-access', 'write');
+        containerRef.current.appendChild(script);
+    }, [callbackUrl, state]);
+
+    return <div ref={containerRef}></div>;
+};
 
 const IntegrationManager = () => {
     const { activeEvent } = useEvent();
+    const location = useLocation();
     const [integrations, setIntegrations] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    // Form states
-    const [discordToken, setDiscordToken] = useState('');
-    const [slackToken, setSlackToken] = useState('');
-    const [whatsappToken, setWhatsappToken] = useState('');
-    const [telegramToken, setTelegramToken] = useState('');
+    useEffect(() => {
+        // Handle OAuth callback alerts from URL query params
+        const params = new URLSearchParams(location.search);
+        const connectStatus = params.get('connect');
+        const platform = params.get('platform');
+
+        if (connectStatus === 'success') {
+            toast.success(`Successfully connected ${platform}!`);
+            // Clean URL gracefully
+            window.history.replaceState({}, document.title, location.pathname);
+        } else if (connectStatus === 'error') {
+            toast.error(`Failed to connect ${platform}.`);
+            window.history.replaceState({}, document.title, location.pathname);
+        }
+    }, [location.search]);
 
     useEffect(() => {
         if (activeEvent) fetchIntegrations();
@@ -29,46 +61,17 @@ const IntegrationManager = () => {
             if (res.ok) {
                 const data = await res.json();
                 setIntegrations(data);
-
-                // Pre-fill forms
-                const discord = data.find(i => i.platform === 'discord');
-                const slack = data.find(i => i.platform === 'slack');
-                const whatsapp = data.find(i => i.platform === 'whatsapp');
-                const telegram = data.find(i => i.platform === 'telegram');
-
-                if (discord) setDiscordToken(discord.credentials.token || '');
-                if (slack) setSlackToken(slack.credentials.token || '');
-                if (whatsapp) setWhatsappToken(whatsapp.credentials.token || '');
-                if (telegram) setTelegramToken(telegram.credentials.token || '');
             }
         } catch (error) {
             console.error(error);
         }
     };
 
-    const handleSave = async (platform, tokenValue) => {
-        setLoading(true);
-        try {
-            const token = localStorage.getItem('token');
-            const res = await fetch(`${API_URL}/api/events/${activeEvent._id}/integrations`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    platform,
-                    credentials: { token: tokenValue },
-                    isActive: true
-                })
-            });
-            if (!res.ok) throw new Error("Failed to save integration");
-            toast.success(`${platform} configuration saved!`);
-            fetchIntegrations();
-        } catch (err) {
-            toast.error(err.message);
-        } finally {
-            setLoading(false);
+    const handleConnect = (platform) => {
+        if (platform === 'discord') {
+            window.location.href = `${API_URL}/api/oauth/discord?state=${activeEvent._id}`;
+        } else if (platform === 'slack') {
+            window.location.href = `${API_URL}/api/oauth/slack?state=${activeEvent._id}`;
         }
     };
 
@@ -105,24 +108,17 @@ const IntegrationManager = () => {
                     <div className="flex items-start bg-slate-900/50 p-3 rounded-lg border border-slate-700 mb-6">
                         <Info className="w-4 h-4 text-primary-400 mt-0.5 mr-2 shrink-0" />
                         <p className="text-slate-400 text-sm">
-                            Go to Discord Developer Portal, create an App & Bot, enable all Intents, and paste the Token below.
+                            Click below to securely authenticate and invite the AgentFAQ bot to a specific Discord server.
                         </p>
                     </div>
 
                     <div className="space-y-4">
-                        <input
-                            type="password"
-                            placeholder="Bot Token"
-                            value={discordToken}
-                            onChange={(e) => setDiscordToken(e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-[#5865F2] outline-none"
-                        />
                         <button
-                            disabled={loading || !discordToken}
-                            onClick={() => handleSave('discord', discordToken)}
-                            className="w-full py-2.5 bg-[#5865F2] hover:bg-[#4752C4] text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                            onClick={() => handleConnect('discord')}
+                            className="w-full py-3 bg-[#5865F2] hover:bg-[#4752C4] flex justify-center items-center text-white rounded-lg font-medium transition-colors"
                         >
-                            Save Configuration
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                            {isConnected('discord') ? 'Re-Connect Discord Bot' : 'Connect to Discord'}
                         </button>
                     </div>
                 </div>
@@ -144,63 +140,17 @@ const IntegrationManager = () => {
                     <div className="flex items-start bg-slate-900/50 p-3 rounded-lg border border-slate-700 mb-6">
                         <Info className="w-4 h-4 text-primary-400 mt-0.5 mr-2 shrink-0" />
                         <p className="text-slate-400 text-sm">
-                            Create a Slack App, add Bot Token Scopes, install to workspace, and paste the <b>xoxb-</b> token below.
+                            Securely authorize AgentFAQ to answer questions inside your chosen Slack workspace.
                         </p>
                     </div>
 
                     <div className="space-y-4">
-                        <input
-                            type="password"
-                            placeholder="xoxb-your-token"
-                            value={slackToken}
-                            onChange={(e) => setSlackToken(e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-[#E01E5A] outline-none"
-                        />
                         <button
-                            disabled={loading || !slackToken}
-                            onClick={() => handleSave('slack', slackToken)}
-                            className="w-full py-2.5 bg-[#E01E5A] hover:bg-[#C91A51] text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                            onClick={() => handleConnect('slack')}
+                            className="w-full py-3 bg-[#E01E5A] hover:bg-[#C91A51] flex items-center justify-center text-white rounded-lg font-medium transition-colors"
                         >
-                            Save Configuration
-                        </button>
-                    </div>
-                </div>
-
-                {/* WHATSAPP */}
-                <div className="bg-slate-800/50 rounded-2xl border border-slate-700/50 shadow-lg p-6 flex flex-col">
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center space-x-3">
-                            <div className="w-12 h-12 rounded-xl bg-[#25D366]/20 flex items-center justify-center text-[#25D366]">
-                                <svg viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.096 3.2 5.077 4.487.71.306 1.264.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z" /></svg>
-                            </div>
-                            <h3 className="text-xl font-bold text-white">WhatsApp</h3>
-                        </div>
-                        {isConnected('whatsapp') ?
-                            <span className="flex items-center text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded"><CheckCircle2 className="w-3 h-3 mr-1" /> Active</span> :
-                            <span className="flex items-center text-xs font-bold text-amber-500 bg-amber-500/10 px-2 py-1 rounded"><AlertCircle className="w-3 h-3 mr-1" /> Not Configured</span>
-                        }
-                    </div>
-                    <div className="flex items-start bg-slate-900/50 p-3 rounded-lg border border-slate-700 mb-6">
-                        <Info className="w-4 h-4 text-primary-400 mt-0.5 mr-2 shrink-0" />
-                        <p className="text-slate-400 text-sm">
-                            Register a Meta Developer App, setup WhatsApp Cloud API, and paste your Temporary or Permanent Access Token below.
-                        </p>
-                    </div>
-
-                    <div className="space-y-4">
-                        <input
-                            type="password"
-                            placeholder="WA API Token"
-                            value={whatsappToken}
-                            onChange={(e) => setWhatsappToken(e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-[#25D366] outline-none"
-                        />
-                        <button
-                            disabled={loading || !whatsappToken}
-                            onClick={() => handleSave('whatsapp', whatsappToken)}
-                            className="w-full py-2.5 bg-[#25D366] hover:bg-[#1DA851] text-white rounded-lg font-medium transition-colors disabled:opacity-50"
-                        >
-                            Save Configuration
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                            {isConnected('slack') ? 'Re-Connect to Slack' : 'Add to Slack'}
                         </button>
                     </div>
                 </div>
@@ -222,25 +172,15 @@ const IntegrationManager = () => {
                     <div className="flex items-start bg-slate-900/50 p-3 rounded-lg border border-slate-700 mb-6">
                         <Info className="w-4 h-4 text-primary-400 mt-0.5 mr-2 shrink-0" />
                         <p className="text-slate-400 text-sm">
-                            Message @BotFather on Telegram, type /newbot, follow the steps, and paste the HTTP API Token below.
+                            Make sure you've added the AgentFAQ Bot to your Telegram group as an Admin. Then use the official login widget below.
                         </p>
                     </div>
 
-                    <div className="space-y-4">
-                        <input
-                            type="password"
-                            placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
-                            value={telegramToken}
-                            onChange={(e) => setTelegramToken(e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-[#0088cc] outline-none"
+                    <div className="space-y-4 flex flex-col items-center justify-center py-4 bg-slate-900 border border-slate-700 rounded-lg">
+                        <TelegramLoginWidget
+                            callbackUrl={`${API_URL}/api/oauth/telegram/callback`}
+                            state={activeEvent._id}
                         />
-                        <button
-                            disabled={loading || !telegramToken}
-                            onClick={() => handleSave('telegram', telegramToken)}
-                            className="w-full py-2.5 bg-[#0088cc] hover:bg-[#0077b3] text-white rounded-lg font-medium transition-colors disabled:opacity-50"
-                        >
-                            Save Configuration
-                        </button>
                     </div>
                 </div>
 

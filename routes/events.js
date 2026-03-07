@@ -4,7 +4,7 @@ const Event = require('../models/Event');
 const Faq = require('../models/Faq');
 const EventMember = require('../models/EventMember');
 const { authenticate } = require('../middleware/auth');
-const { generateOnboardingFAQs } = require('../services/ai');
+const { generateOnboardingFAQs, generateEventDescription } = require('../services/ai');
 
 // Generate unique invite code helper
 const generateInviteCode = async () => {
@@ -21,31 +21,42 @@ const generateInviteCode = async () => {
 // Create event
 router.post('/', authenticate, async (req, res) => {
     try {
-        const { name, description, generateFAQs, faqThreshold } = req.body;
+        const { name, faqThreshold, instagramHandle, websiteUrl, contactNumber, appointmentLink, useAIIntro, details } = req.body;
         const inviteCode = await generateInviteCode();
+
+        let finalDescription = req.body.description || '';
+
+        if (useAIIntro && details) {
+            // Include name in details for the AI prompt
+            finalDescription = await generateEventDescription({ ...details, name });
+        }
+
         const newEvent = new Event({
             name,
-            description,
+            description: finalDescription,
             managerId: req.user.id,
             faqThreshold,
+            instagramHandle,
+            websiteUrl,
+            contactNumber,
+            appointmentLink,
             inviteCode
         });
         await newEvent.save();
 
         let generatedPrompts = [];
-        if (generateFAQs !== false) {
-            generatedPrompts = await generateOnboardingFAQs(name, description);
+        // Always generate initial FAQs, using the standard generated text
+        generatedPrompts = await generateOnboardingFAQs(newEvent);
 
-            // Auto save generated prompts
-            if (generatedPrompts && generatedPrompts.length > 0) {
-                const faqDocs = generatedPrompts.map(p => ({
-                    eventId: newEvent._id,
-                    question: p.question,
-                    answer: p.answer,
-                    platforms: ['discord', 'slack', 'whatsapp']
-                }));
-                await Faq.insertMany(faqDocs);
-            }
+        // Auto save generated prompts
+        if (generatedPrompts && generatedPrompts.length > 0) {
+            const faqDocs = generatedPrompts.map(p => ({
+                eventId: newEvent._id,
+                question: p.question,
+                answer: p.answer,
+                platforms: ['discord', 'slack', 'whatsapp']
+            }));
+            await Faq.insertMany(faqDocs);
         }
 
         res.status(201).json({ event: newEvent, aiPrompts: generatedPrompts });

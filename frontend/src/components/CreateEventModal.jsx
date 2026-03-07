@@ -7,19 +7,27 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const CreateEventModal = ({ isOpen, onClose }) => {
     const { refreshEvents, selectEvent } = useEvent();
-    const [name, setName] = useState('');
-    const [description, setDescription] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [aiPrompts, setAiPrompts] = useState([]);
     const [step, setStep] = useState(1);
+    const [loading, setLoading] = useState(false);
     const [loadingPhrase, setLoadingPhrase] = useState('');
+    const [aiPrompts, setAiPrompts] = useState([]);
 
+    // Form data
+    const [name, setName] = useState('');
+    const [details, setDetails] = useState({
+        date: '',
+        time: '',
+        location: '',
+        duration: '',
+        prizes: '',
+        theme: ''
+    });
     const PHRASES = [
         "Waking up the AI...",
-        "Analyzing your event details...",
-        "Grinding those FAQs...",
-        "Reading between the lines...",
-        "Structuring knowledge base...",
+        "Converting your details into magic...",
+        "Crafting a stellar event intro...",
+        "Polishing the paragraphs...",
+        "Preparing your FAQ database...",
         "Almost there..."
     ];
 
@@ -38,10 +46,19 @@ const CreateEventModal = ({ isOpen, onClose }) => {
 
     if (!isOpen) return null;
 
-    const handleSubmit = async (e) => {
+    const handleNextStep = (e) => {
         e.preventDefault();
         if (!name.trim()) return toast.error("Event name is required");
+        setStep(2);
+    };
 
+    const handleDetailChange = (e) => {
+        const { name, value } = e.target;
+        setDetails(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
@@ -53,7 +70,11 @@ const CreateEventModal = ({ isOpen, onClose }) => {
             const res = await fetch(`${API_URL}/api/events`, {
                 method: 'POST',
                 headers,
-                body: JSON.stringify({ name, description })
+                body: JSON.stringify({
+                    name,
+                    useAIIntro: true,
+                    details
+                })
             });
 
             if (!res.ok) throw new Error("Failed to create event");
@@ -61,11 +82,11 @@ const CreateEventModal = ({ isOpen, onClose }) => {
 
             await refreshEvents();
             selectEvent(responseData.event._id);
-            toast.success("Event created! AI generated starting FAQs.");
+            toast.success("Event created! Magic successfully applied.");
 
             if (responseData.aiPrompts && responseData.aiPrompts.length > 0) {
                 setAiPrompts(responseData.aiPrompts);
-                setStep(2); // Move to review step
+                setStep(3); // Move to review step
             } else {
                 handleClose();
             }
@@ -79,7 +100,7 @@ const CreateEventModal = ({ isOpen, onClose }) => {
     const handleClose = () => {
         setStep(1);
         setName('');
-        setDescription('');
+        setDetails({ date: '', time: '', location: '', duration: '', prizes: '', theme: '' });
         setAiPrompts([]);
         onClose();
     };
@@ -89,57 +110,88 @@ const CreateEventModal = ({ isOpen, onClose }) => {
             <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="text-xl font-bold text-white">
-                        {step === 1 ? 'Create New Event' : 'AI Setup: Generated FAQs'}
+                        {step === 1 && 'Step 1: Event Name'}
+                        {step === 2 && 'Step 2: The Details'}
+                        {step === 3 && 'AI Setup: Generated Content'}
                     </h3>
                     <button onClick={handleClose} className="text-slate-400 hover:text-white">
                         <X className="w-6 h-6" />
                     </button>
                 </div>
 
-                {step === 1 ? (
-                    <form onSubmit={handleSubmit} className="space-y-4">
+                {step === 1 && (
+                    <form onSubmit={handleNextStep} className="space-y-4">
+                        <p className="text-slate-400 text-sm mb-4">Let's start with the basics. What's the name of your event?</p>
                         <div>
-                            <label className="block text-sm font-medium text-slate-400 mb-2">Event Name</label>
                             <input
                                 value={name}
                                 onChange={e => setName(e.target.value)}
-                                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-primary-500 outline-none"
-                                placeholder="e.g. HackMIT 2026"
+                                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-4 text-xl text-white focus:ring-2 focus:ring-primary-500 outline-none"
+                                placeholder="e.g. Google I/O 2026"
                                 autoFocus
                             />
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-400 mb-2">Description</label>
-                            <textarea
-                                value={description}
-                                onChange={e => setDescription(e.target.value)}
-                                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white h-24 resize-none focus:ring-2 focus:ring-primary-500 outline-none"
-                                placeholder="Brief description of the event..."
-                            />
-                        </div>
                         <div className="mt-8 flex justify-end space-x-3 pt-4 border-t border-slate-800">
-                            <button
-                                type="button"
-                                onClick={handleClose}
-                                className="px-4 py-2 text-slate-300 hover:text-white transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="px-6 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-medium shadow-lg transition-all disabled:opacity-50 min-w-[200px]"
-                            >
-                                {loading ? (
-                                    <div className="flex items-center justify-center animate-pulse">
-                                        <Sparkles className="w-4 h-4 mr-2" />
-                                        {loadingPhrase}
-                                    </div>
-                                ) : "Create Event & Setup"}
+                            <button type="button" onClick={handleClose} className="px-4 py-2 text-slate-300 hover:text-white transition-colors">Cancel</button>
+                            <button type="submit" disabled={!name.trim()} className="px-6 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-medium shadow-lg transition-all disabled:opacity-50 min-w-[120px]">
+                                Next Goal
                             </button>
                         </div>
                     </form>
-                ) : (
+                )}
+
+                {step === 2 && (
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <p className="text-slate-400 text-sm mb-4">Fill out whatever you know. Our AI will automatically write an engaging description and create your starting FAQs based on this info!</p>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-medium text-slate-400 mb-1">Date(s)*</label>
+                                <input name="date" value={details.date} onChange={handleDetailChange} required className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white focus:ring-2 focus:ring-primary-500 outline-none placeholder:text-slate-600" placeholder="e.g. Dec 10-12" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-slate-400 mb-1">Duration / Days</label>
+                                <input name="duration" value={details.duration} onChange={handleDetailChange} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white focus:ring-2 focus:ring-primary-500 outline-none placeholder:text-slate-600" placeholder="e.g. 3 Days" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-slate-400 mb-1">Time</label>
+                                <input name="time" value={details.time} onChange={handleDetailChange} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white focus:ring-2 focus:ring-primary-500 outline-none placeholder:text-slate-600" placeholder="e.g. 9 AM - 5 PM" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-slate-400 mb-1">Location</label>
+                                <input name="location" value={details.location} onChange={handleDetailChange} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white focus:ring-2 focus:ring-primary-500 outline-none placeholder:text-slate-600" placeholder="e.g. San Francisco, CA" />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-medium text-slate-400 mb-1">Goodies & Prizes</label>
+                            <input name="prizes" value={details.prizes} onChange={handleDetailChange} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white focus:ring-2 focus:ring-primary-500 outline-none placeholder:text-slate-600" placeholder="e.g. T-Shirts, Macbook Pro for winners" />
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-medium text-slate-400 mb-1">Theme / Vibe</label>
+                            <input name="theme" value={details.theme} onChange={handleDetailChange} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white focus:ring-2 focus:ring-primary-500 outline-none placeholder:text-slate-600" placeholder="e.g. Cyberpunk, Fast-paced, Educational" />
+                        </div>
+
+                        <div className="mt-8 flex items-center justify-between pt-4 border-t border-slate-800">
+                            <button type="button" onClick={() => setStep(1)} className="text-sm px-4 py-2 text-slate-400 hover:text-white transition-colors">Back</button>
+                            <div className="flex space-x-3">
+                                <button type="submit" disabled={loading} className="px-6 py-2 bg-gradient-to-r from-primary-600 to-indigo-600 hover:from-primary-500 hover:to-indigo-500 text-white rounded-lg font-medium shadow-lg shadow-indigo-500/25 transition-all disabled:opacity-50 min-w-[240px]">
+                                    {loading ? (
+                                        <div className="flex items-center justify-center animate-pulse">
+                                            <Sparkles className="w-4 h-4 mr-2" />
+                                            {loadingPhrase}
+                                        </div>
+                                    ) : (
+                                        <span className="flex items-center justify-center"><Sparkles className="w-4 h-4 mr-2" />Let's make the intro of events!</span>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                )}
+
+                {step === 3 && (
                     <div className="space-y-4">
                         <p className="text-slate-400 text-sm mb-4">
                             Our AI has generated some starting FAQs based on your event description. They have been saved to your dashboard.

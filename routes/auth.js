@@ -4,6 +4,28 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_jwt_key';
+const { authenticate } = require('../middleware/auth');
+
+// GET /api/auth/me
+router.get('/me', authenticate, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/auth/me
+router.put('/me', authenticate, async (req, res) => {
+  try {
+    const { phoneNumber, linkedinProfile } = req.body;
+    const user = await User.findByIdAndUpdate(req.user.id, { phoneNumber, linkedinProfile }, { new: true }).select('-password');
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // POST /api/auth/register
 router.post('/register', async (req, res) => {

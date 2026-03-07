@@ -135,16 +135,16 @@ const Sidebar = () => {
 
         {/* Footer */}
         <div className="mt-auto p-6 border-t border-slate-800/50 flex items-center justify-between">
-          <div className="flex items-center space-x-3 p-3 rounded-xl bg-slate-800/30 border border-slate-700/50 hover:bg-slate-800/50 transition-colors cursor-pointer group flex-1">
+          <Link to="/profile" className="flex items-center space-x-3 p-3 rounded-xl bg-slate-800/30 border border-slate-700/50 hover:bg-slate-800/50 transition-colors cursor-pointer group flex-1 text-left">
             <div className="w-10 h-10 rounded-full bg-gradient-to-r from-slate-700 to-slate-600 flex items-center justify-center text-sm font-bold text-white border-2 border-slate-700 group-hover:border-primary-500/50 transition-colors">
               U
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-200 truncate">Agent User</p>
-              <p className="text-xs text-slate-500 truncate">Manager</p>
+              <p className="text-sm font-medium text-slate-200 truncate">My Profile</p>
+              <p className="text-xs text-slate-500 truncate">Edit Contact Info</p>
             </div>
             <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-slate-400" />
-          </div>
+          </Link>
 
           <button
             onClick={handleLogout}

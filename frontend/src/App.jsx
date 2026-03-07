@@ -15,6 +15,7 @@ import Integrations from './pages/Integrations.jsx';
 import Landing from './pages/Landing.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
+import Profile from './pages/Profile.jsx';
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -47,6 +48,7 @@ export default function App() {
                     <Route path="/team" element={<Team />} />
                     <Route path="/integrations" element={<Integrations />} />
                     <Route path="/settings" element={<Settings />} />
+                    <Route path="/profile" element={<Profile />} />
                     <Route path="/suggested" element={<Suggested />} />
                     <Route path="*" element={<div className="text-center py-20 text-slate-500">404 - Page not found</div>} />
                   </Routes>

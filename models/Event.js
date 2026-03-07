@@ -6,6 +6,10 @@ const EventSchema = new mongoose.Schema({
   managerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   faqThreshold: { type: Number, default: 0.8 }, // Threshold to auto-answer
   inviteCode: { type: String, unique: true },
+  instagramHandle: { type: String, default: '' },
+  websiteUrl: { type: String, default: '' },
+  contactNumber: { type: String, default: '' },
+  appointmentLink: { type: String, default: '' },
   createdAt: { type: Date, default: Date.now },
 });
 
