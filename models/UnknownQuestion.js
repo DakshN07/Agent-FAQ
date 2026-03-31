@@ -32,6 +32,15 @@ const unknownQuestionSchema = new mongoose.Schema({
   channelId: {
     type: String,
   },
+  isHandoffRequested: {
+    type: Boolean,
+    default: false
+  },
+  handoffStatus: {
+    type: String,
+    enum: ['pending', 'resolved', 'ignored'],
+    default: 'pending'
+  },
   timestamp: {
     type: Date,
     default: Date.now

@@ -44,6 +44,10 @@ class IntegrationManager {
             case 'telegram':
                 adapterInstance = new TelegramAdapter(integration.eventId, {}, { token: process.env.TELEGRAM_BOT_TOKEN, ...integration.credentials }, this.handleIncomingMessage.bind(this));
                 break;
+            case 'whatsapp':
+                const WhatsappAdapter = require('../adapters/WhatsappAdapter');
+                adapterInstance = new WhatsappAdapter(integration.eventId, {}, { ...integration.credentials }, this.handleIncomingMessage.bind(this));
+                break;
             default:
                 console.log(`[IntegrationManager] Unrecognized platform: ${integration.platform}`);
                 return;
@@ -81,13 +85,21 @@ class IntegrationManager {
         try {
             // 1. Log query attempt
             await Analytics.updateOne(
-                { eventId, platform: sourcePlatform, date: new Date().setHours(0, 0, 0, 0) },
-                { $inc: { totalQueries: 1, uniqueUsers: 0 } }, // For simplicity, we can do $addToSet uniqueUsers in a pre/post hook later
+                { eventId, platform: sourcePlatform },
+                { $inc: { matched: 0 } },
                 { upsert: true }
             );
 
-            // 2. Fetch FAQs for this Event and Platform
-            const faqs = await Faq.find({ eventId, platforms: sourcePlatform });
+            // 2. Fetch FAQs for this Event — include platform-specific AND global FAQs (empty platforms array)
+            const faqs = await Faq.find({ 
+                eventId, 
+                $or: [
+                    { platforms: sourcePlatform },
+                    { platforms: { $size: 0 } },
+                    { platforms: { $exists: false } }
+                ]
+            });
+            console.log(`[${eventId}] Found ${faqs.length} FAQs for matching`);
             if (!faqs.length) {
                 // If no FAQs for the event, we can't answer. Add direct to unknown.
                 return await this.handleUnknown(normalizedMsg);
@@ -114,8 +126,8 @@ class IntegrationManager {
             if (bestScore >= THRESHOLD) {
                 console.log(`[Match] score ${bestScore.toFixed(2)} for: "${bestMatch.question}"`);
                 await Analytics.updateOne(
-                    { eventId, platform: sourcePlatform, date: new Date().setHours(0, 0, 0, 0) },
-                    { $inc: { matchedQueries: 1 } },
+                    { eventId, platform: sourcePlatform },
+                    { $inc: { matched: 1 } },
                     { upsert: true }
                 );
 
@@ -135,7 +147,7 @@ class IntegrationManager {
         }
     }
 
-    async handleUnknown(normalizedMsg) {
+    async handleUnknown(normalizedMsg, userEmbedding) {
         const { eventId, sourcePlatform, channelId, userId, text } = normalizedMsg;
 
         let unknownSession = await UnknownQuestion.findOne({ eventId, text });
@@ -143,26 +155,29 @@ class IntegrationManager {
             unknownSession = new UnknownQuestion({
                 eventId,
                 text,
+                embedding: userEmbedding || [],
                 count: 1,
                 sourcePlatform,
-                channelId
+                channelId,
+                isHandoffRequested: true,
+                handoffStatus: 'pending'
             });
         } else {
             unknownSession.count += 1;
             unknownSession.lastAskedAt = Date.now();
-            // Update the location to reply to the latest thread
             unknownSession.sourcePlatform = sourcePlatform;
             unknownSession.channelId = channelId;
+            unknownSession.isHandoffRequested = true;
+            unknownSession.handoffStatus = 'pending';
         }
         await unknownSession.save();
 
-        console.log(`[Unknown] Logged: "${text}" x${unknownSession.count}`);
-        // Optional: Auto-reply to let them know it's being reviewed
-        if (unknownSession.count === 1) { // Only first time to not spam
-            const adapter = this.getAdapter(eventId, sourcePlatform);
-            if (adapter) {
-                // await adapter.sendMessage(channelId, "I'm not quite sure about that yet, but I've noted your question for the team.");
-            }
+        console.log(`[Unknown/Handoff] Logged: "${text}" x${unknownSession.count}`);
+        
+        // Auto-reply to let them know it's being reviewed by a human
+        const adapter = this.getAdapter(eventId, sourcePlatform);
+        if (adapter) {
+            await adapter.sendMessage(channelId, "I'm not quite sure about that yet, but I've escalated your question to my human team. They will get back to you shortly!");
         }
     }
 

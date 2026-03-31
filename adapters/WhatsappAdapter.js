@@ -15,15 +15,18 @@ class WhatsappAdapter extends BaseAdapter {
 
     async sendMessage(destinationId, text) {
         console.log(`[Event ${this.eventId}] Sending WhatsApp message to ${destinationId}: ${text}`);
-        // Example for WhatsApp Business Cloud API:
-        // await axios.post(`https://graph.facebook.com/v17.0/${this.credentials.phoneNumberId}/messages`, {
-        //   messaging_product: 'whatsapp',
-        //   to: destinationId,
-        //   type: 'text',
-        //   text: { body: text }
-        // }, {
-        //   headers: { Authorization: `Bearer ${this.credentials.token}` }
-        // });
+        try {
+            await axios.post(`https://graph.facebook.com/v17.0/${this.credentials.phoneNumberId}/messages`, {
+                messaging_product: 'whatsapp',
+                to: destinationId,
+                type: 'text',
+                text: { body: text }
+            }, {
+                headers: { Authorization: `Bearer ${this.credentials.token}` }
+            });
+        } catch (err) {
+            console.error(`[Event ${this.eventId}] WhatsApp send error:`, err.response?.data || err.message);
+        }
     }
 
     parseWebhook(payload) {

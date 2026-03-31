@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -38,6 +38,26 @@ const Sidebar = () => {
   const { events, activeEvent, selectEvent } = useEvent();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const navigate = useNavigate();
+
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        try {
+          const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+          const res = await fetch(`${apiUrl}/api/auth/me`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (res.ok) {
+            setUser(await res.json());
+          }
+        } catch (e) {}
+      }
+    };
+    fetchUser();
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -135,15 +155,15 @@ const Sidebar = () => {
 
         {/* Footer */}
         <div className="mt-auto p-6 border-t border-slate-800/50 flex items-center justify-between">
-          <Link to="/profile" className="flex items-center space-x-3 p-3 rounded-xl bg-slate-800/30 border border-slate-700/50 hover:bg-slate-800/50 transition-colors cursor-pointer group flex-1 text-left">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-slate-700 to-slate-600 flex items-center justify-center text-sm font-bold text-white border-2 border-slate-700 group-hover:border-primary-500/50 transition-colors">
-              U
+          <Link to="/profile" className="flex items-center space-x-3 p-3 rounded-xl bg-slate-800/30 border border-slate-700/50 hover:bg-slate-800/50 transition-colors cursor-pointer group flex-1 text-left min-w-0">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-slate-700 to-slate-600 flex items-center justify-center text-sm font-bold text-white border-2 border-slate-700 group-hover:border-primary-500/50 transition-colors shrink-0">
+              {user?.username ? user.username.charAt(0).toUpperCase() : 'U'}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-200 truncate">My Profile</p>
-              <p className="text-xs text-slate-500 truncate">Edit Contact Info</p>
+              <p className="text-sm font-medium text-slate-200 truncate">{user?.username || 'My Profile'}</p>
+              <p className="text-xs text-slate-500 truncate">{user?.email || 'Edit Contact Info'}</p>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-slate-400" />
+            <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-slate-400 shrink-0" />
           </Link>
 
           <button

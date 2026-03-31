@@ -4,7 +4,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const generateOnboardingFAQs = async (eventInfo) => {
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
         const prompt = `
         You are an AI assistant helping an event manager set up a new event platform called Agent-FAQ.
@@ -48,8 +48,8 @@ const generateOnboardingFAQs = async (eventInfo) => {
 
 const generateEventDescription = async (details) => {
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const { name, date, time, duration, location, prizes, theme } = details;
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        const { name, date, startTime, endTime, location, prizes, theme } = details;
 
         const prompt = `
         You are a talented, professional copywriter helping an event manager create an enthusiastic, emotionally engaging introduction paragraph for their new event platform called Agent-FAQ.
@@ -59,8 +59,8 @@ const generateEventDescription = async (details) => {
         
         Raw Details given by the organizer:
         - Date: ${date || 'TBD'}
-        - Time: ${time || 'TBD'}
-        - Duration: ${duration || 'TBD'}
+        - Start Time: ${startTime || 'TBD'}
+        - End Time: ${endTime || 'TBD'}
         - Location: ${location || 'TBD'}
         - Goodies / Prizes: ${prizes || 'None specified'}
         - Theme / Vibe: ${theme || 'None specified'}

@@ -46,7 +46,8 @@ class DiscordAdapter extends BaseAdapter {
                 }
             });
 
-            await this.client.login(this.credentials.token);
+            const botToken = process.env.DISCORD_TOKEN || this.credentials.token;
+            await this.client.login(botToken);
         } catch (err) {
             console.error(`[Event ${this.eventId}] Failed to init Discord config: ${err.message}`);
             throw err;

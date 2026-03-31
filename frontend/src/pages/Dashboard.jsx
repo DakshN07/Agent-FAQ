@@ -15,6 +15,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useEvent } from '../contexts/EventContext';
 import CreateEventModal from '../components/CreateEventModal';
 import JoinEventModal from '../components/JoinEventModal';
+import { motion } from 'framer-motion';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -102,25 +103,33 @@ const Dashboard = () => {
     { name: 'Sun', queries: 0 },
   ];
 
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
+  };
+
   const StatCard = ({ title, value, icon: Icon, trend, trendValue, colorClass }) => (
-    <div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700/50 shadow-lg backdrop-blur-sm hover:bg-slate-800/80 transition-all duration-300 group">
-      <div className="flex justify-between items-start mb-4">
-        <div className={`p-3 rounded-xl ${colorClass} bg-opacity-20 group-hover:scale-110 transition-transform duration-300`}>
-          <Icon className={`w-6 h-6 ${colorClass.replace('bg-', 'text-')}`} />
-        </div>
-        {trend && (
-          <div className={`flex items-center text-xs font-medium px-2 py-1 rounded-full ${trend === 'up' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'
-            }`}>
-            {trend === 'up' ? <ArrowUpRight className="w-3 h-3 mr-1" /> : <ArrowDownRight className="w-3 h-3 mr-1" />}
-            {trendValue}
+    <motion.div variants={itemVariants} className="relative group">
+      <div className={`absolute -inset-0.5 bg-gradient-to-r ${colorClass.replace('bg-', 'from-').replace('500', '500 to-primary-500')} rounded-2xl opacity-0 group-hover:opacity-20 blur transition duration-500`}></div>
+      <div className="relative h-full glass p-6 rounded-2xl transition-all duration-300">
+        <div className="flex justify-between items-start mb-4">
+          <div className={`p-3 rounded-xl ${colorClass} bg-opacity-20 group-hover:scale-110 shadow-inner transition-transform duration-300`}>
+            <Icon className={`w-6 h-6 ${colorClass.replace('bg-', 'text-')}`} />
           </div>
-        )}
+          {trend && (
+            <div className={`flex items-center text-xs font-bold px-2.5 py-1 rounded-full shadow-sm ${trend === 'up' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+              }`}>
+              {trend === 'up' ? <ArrowUpRight className="w-3.5 h-3.5 mr-1" /> : <ArrowDownRight className="w-3.5 h-3.5 mr-1" />}
+              {trendValue}
+            </div>
+          )}
+        </div>
+        <div>
+          <h3 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 tracking-tight">{value}</h3>
+          <p className="text-sm font-medium text-slate-400 mt-2">{title}</p>
+        </div>
       </div>
-      <div>
-        <h3 className="text-3xl font-bold text-white tracking-tight">{value}</h3>
-        <p className="text-sm font-medium text-slate-400 mt-1">{title}</p>
-      </div>
-    </div>
+    </motion.div>
   );
 
   if (contextLoading || (loading && activeEvent)) {
@@ -166,18 +175,26 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="space-y-8 animate-fade-in max-w-7xl mx-auto">
+    <motion.div 
+      initial="hidden" 
+      animate="visible" 
+      variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
+      className="space-y-8 max-w-7xl mx-auto pb-12"
+    >
       {/* Header */}
-      <div className="flex justify-between items-end">
+      <motion.div variants={itemVariants} className="flex justify-between items-end">
         <div>
-          <h2 className="text-3xl font-bold text-white tracking-tight">Overview</h2>
-          <p className="text-slate-400 mt-2">Welcome back! Here's what's happening today.</p>
+          <h2 className="text-4xl font-extrabold text-white tracking-tight">Overview</h2>
+          <p className="text-slate-400 mt-2 text-lg">Welcome back! Here's what's happening today.</p>
         </div>
-        <div className="flex items-center space-x-2 text-sm text-slate-400 bg-slate-800/50 px-4 py-2 rounded-lg border border-slate-700/50 shadow-sm">
-          <Activity className="w-4 h-4 text-emerald-500" />
+        <div className="flex items-center space-x-2 text-sm font-semibold text-emerald-400 bg-emerald-500/10 px-4 py-2 rounded-xl border border-emerald-500/20 shadow-sm">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
           <span>Live updates active</span>
         </div>
-      </div>
+      </motion.div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -216,35 +233,35 @@ const Dashboard = () => {
       </div>
 
       {/* Platform Breakdown */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
-        <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 shadow-sm flex items-center justify-between col-span-1 md:col-start-1">
-          <span className="text-slate-400 font-medium">Discord API</span>
-          <span className="text-white font-bold">{stats?.perPlatform?.discord || 0} msgs</span>
+      <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+        <div className="glass p-4 rounded-xl flex items-center justify-between col-span-1 md:col-start-1 group hover:border-primary-500/50 transition-colors">
+          <span className="text-slate-400 font-medium flex items-center"><span className="w-2 h-2 rounded-full bg-[#5865F2] mr-2"></span> Discord API</span>
+          <span className="text-white font-bold group-hover:text-primary-400 transition-colors">{stats?.perPlatform?.discord || 0} msgs</span>
         </div>
-        <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 shadow-sm flex items-center justify-between">
-          <span className="text-slate-400 font-medium">Slack API</span>
-          <span className="text-white font-bold">{stats?.perPlatform?.slack || 0} msgs</span>
+        <div className="glass p-4 rounded-xl flex items-center justify-between group hover:border-pink-500/50 transition-colors">
+          <span className="text-slate-400 font-medium flex items-center"><span className="w-2 h-2 rounded-full bg-[#E01E5A] mr-2"></span> Slack API</span>
+          <span className="text-white font-bold group-hover:text-pink-400 transition-colors">{stats?.perPlatform?.slack || 0} msgs</span>
         </div>
-        <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 shadow-sm flex items-center justify-between">
-          <span className="text-slate-400 font-medium">WhatsApp API</span>
-          <span className="text-white font-bold">{stats?.perPlatform?.whatsapp || 0} msgs</span>
+        <div className="glass p-4 rounded-xl flex items-center justify-between group hover:border-emerald-500/50 transition-colors">
+          <span className="text-slate-400 font-medium flex items-center"><span className="w-2 h-2 rounded-full bg-[#25D366] mr-2"></span> WhatsApp API</span>
+          <span className="text-white font-bold group-hover:text-emerald-400 transition-colors">{stats?.perPlatform?.whatsapp || 0} msgs</span>
         </div>
-        <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 shadow-sm flex items-center justify-between">
-          <span className="text-slate-400 font-medium">Web / Manual</span>
-          <span className="text-white font-bold">{stats?.perPlatform?.web || 0} msgs</span>
+        <div className="glass p-4 rounded-xl flex items-center justify-between group hover:border-indigo-500/50 transition-colors">
+          <span className="text-slate-400 font-medium flex items-center"><span className="w-2 h-2 rounded-full bg-indigo-500 mr-2"></span> Web / Manual</span>
+          <span className="text-white font-bold group-hover:text-indigo-400 transition-colors">{stats?.perPlatform?.web || 0} msgs</span>
         </div>
-      </div>
+      </motion.div>
 
       {/* Main Chart Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
         {/* Activity Chart */}
-        <div className="lg:col-span-2 bg-slate-800/50 p-6 rounded-2xl border border-slate-700/50 shadow-sm backdrop-blur-sm">
+        <motion.div variants={itemVariants} className="lg:col-span-2 glass rounded-2xl p-6">
           <div className="flex justify-between items-center mb-8">
             <div>
               <h3 className="text-lg font-bold text-white">Activity Trends</h3>
               <p className="text-sm text-slate-400">Daily question volume</p>
             </div>
-            <select className="bg-slate-900 border border-slate-700 text-sm text-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-primary-500/50">
+            <select className="bg-slate-900 border border-white/10 text-sm font-medium text-slate-300 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-primary-500/50 shadow-inner">
               <option>Last 7 days</option>
               <option>Last 30 days</option>
             </select>
@@ -289,14 +306,13 @@ const Dashboard = () => {
                   fillOpacity={1}
                   fill="url(#colorQueries)"
                 />
-              </AreaChart>
+                </AreaChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </motion.div>
 
-        {/* Recent Activity List */}
-        <div className="bg-slate-800/50 p-6 rounded-2xl border border-slate-700/50 shadow-sm flex flex-col backdrop-blur-sm">
-          <h3 className="text-lg font-bold text-white mb-6">Recent Live Feed</h3>
+        <motion.div variants={itemVariants} className="glass rounded-2xl p-6 flex flex-col">
+          <h3 className="text-xl font-bold text-white mb-6">Recent Live Feed</h3>
           <div className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar">
             {(stats?.pendingQuestions || []).slice(0, 5).map((q, i) => (
               <div key={i} className="flex items-start space-x-4 group">
@@ -317,14 +333,14 @@ const Dashboard = () => {
               <div className="text-sm text-slate-500 text-center mt-10">No recent questions!</div>
             )}
           </div>
-          <button onClick={() => window.location.href = '/activity'} className="w-full mt-6 py-3 text-sm font-medium text-slate-300 bg-slate-700/50 rounded-xl hover:bg-slate-700 transition-colors flex items-center justify-center border border-slate-700">
-            View All History <ArrowUpRight className="w-4 h-4 ml-2" />
+          <button onClick={() => window.location.href = '/activity'} className="w-full mt-6 py-3.5 text-sm font-semibold text-slate-300 bg-slate-800/80 rounded-xl hover:bg-slate-700 transition-colors flex items-center justify-center border border-white/5 shadow-sm group">
+            View All History <ArrowUpRight className="w-4 h-4 ml-2 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
           </button>
-        </div>
+        </motion.div>
       </div>
       <CreateEventModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} />
       <JoinEventModal isOpen={isJoinModalOpen} onClose={() => setIsJoinModalOpen(false)} />
-    </div>
+    </motion.div>
   );
 };
 

@@ -16,9 +16,9 @@ const CreateEventModal = ({ isOpen, onClose }) => {
     const [name, setName] = useState('');
     const [details, setDetails] = useState({
         date: '',
-        time: '',
+        startTime: '',
+        endTime: '',
         location: '',
-        duration: '',
         prizes: '',
         theme: ''
     });
@@ -77,7 +77,10 @@ const CreateEventModal = ({ isOpen, onClose }) => {
                 })
             });
 
-            if (!res.ok) throw new Error("Failed to create event");
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || "Failed to create event");
+            }
             const responseData = await res.json();
 
             await refreshEvents();
@@ -100,7 +103,7 @@ const CreateEventModal = ({ isOpen, onClose }) => {
     const handleClose = () => {
         setStep(1);
         setName('');
-        setDetails({ date: '', time: '', location: '', duration: '', prizes: '', theme: '' });
+        setDetails({ date: '', startTime: '', endTime: '', location: '', prizes: '', theme: '' });
         setAiPrompts([]);
         onClose();
     };
@@ -146,16 +149,18 @@ const CreateEventModal = ({ isOpen, onClose }) => {
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-xs font-medium text-slate-400 mb-1">Date(s)*</label>
-                                <input name="date" value={details.date} onChange={handleDetailChange} required className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white focus:ring-2 focus:ring-primary-500 outline-none placeholder:text-slate-600" placeholder="e.g. Dec 10-12" />
+                                <label className="block text-xs font-medium text-slate-400 mb-1">Date*</label>
+                                <input type="date" name="date" value={details.date} onChange={handleDetailChange} required className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white focus:ring-2 focus:ring-primary-500 outline-none placeholder:text-slate-600 [color-scheme:dark]" />
                             </div>
-                            <div>
-                                <label className="block text-xs font-medium text-slate-400 mb-1">Duration / Days</label>
-                                <input name="duration" value={details.duration} onChange={handleDetailChange} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white focus:ring-2 focus:ring-primary-500 outline-none placeholder:text-slate-600" placeholder="e.g. 3 Days" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-slate-400 mb-1">Time</label>
-                                <input name="time" value={details.time} onChange={handleDetailChange} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white focus:ring-2 focus:ring-primary-500 outline-none placeholder:text-slate-600" placeholder="e.g. 9 AM - 5 PM" />
+                            <div className="col-span-2 grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-400 mb-1">Start Time</label>
+                                    <input type="time" name="startTime" value={details.startTime} onChange={handleDetailChange} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white focus:ring-2 focus:ring-primary-500 outline-none placeholder:text-slate-600 [color-scheme:dark]" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-400 mb-1">End Time</label>
+                                    <input type="time" name="endTime" value={details.endTime} onChange={handleDetailChange} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white focus:ring-2 focus:ring-primary-500 outline-none placeholder:text-slate-600 [color-scheme:dark]" />
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-slate-400 mb-1">Location</label>

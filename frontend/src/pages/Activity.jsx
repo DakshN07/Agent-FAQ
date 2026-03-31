@@ -98,6 +98,12 @@ const Activity = () => {
                                             <span className="px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 text-xs border border-slate-600">
                                                 Platform: <span className="capitalize">{question.sourcePlatform || 'Website'}</span>
                                             </span>
+                                            {question.isHandoffRequested && (
+                                                <span className="px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-400 text-xs font-bold border border-rose-500/20 flex items-center shadow-sm">
+                                                    <AlertCircle className="w-3 h-3 mr-1" />
+                                                    Human Handoff
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="ml-4 flex flex-col items-end space-y-2">

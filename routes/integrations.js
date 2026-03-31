@@ -51,6 +51,11 @@ router.post('/', async (req, res) => {
         }
 
         await integration.save();
+        
+        // Immediately start the adapter
+        const integrationManager = require('../services/IntegrationManager');
+        await integrationManager.startIntegration(integration);
+        
         res.json(integration);
     } catch (error) {
         res.status(400).json({ error: error.message });

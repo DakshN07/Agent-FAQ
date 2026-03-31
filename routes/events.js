@@ -5,6 +5,7 @@ const Faq = require('../models/Faq');
 const EventMember = require('../models/EventMember');
 const { authenticate } = require('../middleware/auth');
 const { generateOnboardingFAQs, generateEventDescription } = require('../services/ai');
+const { getEmbedding } = require('../services/embedding');
 
 // Generate unique invite code helper
 const generateInviteCode = async () => {
@@ -48,15 +49,31 @@ router.post('/', authenticate, async (req, res) => {
         // Always generate initial FAQs, using the standard generated text
         generatedPrompts = await generateOnboardingFAQs(newEvent);
 
-        // Auto save generated prompts
+        // Auto save generated FAQs with embeddings for instant bot matching
         if (generatedPrompts && generatedPrompts.length > 0) {
-            const faqDocs = generatedPrompts.map(p => ({
-                eventId: newEvent._id,
-                question: p.question,
-                answer: p.answer,
-                platforms: ['discord', 'slack', 'whatsapp']
-            }));
-            await Faq.insertMany(faqDocs);
+            for (const p of generatedPrompts) {
+                try {
+                    const embedding = await getEmbedding(p.question);
+                    const faq = new Faq({
+                        eventId: newEvent._id,
+                        question: p.question,
+                        answer: p.answer,
+                        platforms: ['discord', 'slack', 'whatsapp', 'telegram'],
+                        embedding: embedding || []
+                    });
+                    await faq.save();
+                } catch (embErr) {
+                    // Still save FAQ even if embedding fails
+                    const faq = new Faq({
+                        eventId: newEvent._id,
+                        question: p.question,
+                        answer: p.answer,
+                        platforms: ['discord', 'slack', 'whatsapp', 'telegram'],
+                        embedding: []
+                    });
+                    await faq.save();
+                }
+            }
         }
 
         res.status(201).json({ event: newEvent, aiPrompts: generatedPrompts });

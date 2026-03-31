@@ -18,6 +18,11 @@ const saveIntegration = async (eventId, platform, credentials) => {
             integration = new Integration({ eventId, platform, credentials, isActive: true });
         }
         await integration.save();
+        
+        // Immediately start the adapter without requiring a server restart
+        const integrationManager = require('../services/IntegrationManager');
+        await integrationManager.startIntegration(integration);
+        
         return true;
     } catch (e) {
         console.error("Integration Save Error:", e);
@@ -87,7 +92,7 @@ router.get('/discord/callback', async (req, res) => {
         // Ensure redirect_uri accurately matches what you entered in Discord Dev Portal
         params.append('redirect_uri', `${process.env.VITE_API_URL || 'http://localhost:3000'}/api/oauth/discord/callback`);
 
-        const response = await axios.post('https://discord.com/api/oauth2/token', params.toString(), {
+        const response = await axios.post('https://discord.com/api/oauth2/token', params, {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
         });
 
