@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+alembic
+pgvector
+redis
+langchain
+langchain-openai
+langchain-community
+langgraph
+python-dotenv
+pydantic
+pydantic-settings
+python-multipart
+pypdf
+tiktoken
