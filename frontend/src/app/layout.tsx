@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Multi-Agent Enterprise Assistant",
-  description: "RAG-based enterprise knowledge assistant with workflow automation.",
+  title: "Agent-FAQ | Omnichannel Event Intelligence",
+  description: "Centralized AI-driven inbox for event communities.",
 };
 
 export default function RootLayout({
@@ -15,8 +15,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={inter.className}>{children}</body>
+    <html lang="en" className="dark">
+      <body className={`${inter.className} min-h-screen bg-background text-foreground antialiased`}>
+        {children}
+      </body>
     </html>
   );
 }
