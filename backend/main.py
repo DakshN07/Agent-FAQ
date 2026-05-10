@@ -4,6 +4,8 @@ import uvicorn
 from .api.routes import router as api_router
 from .api.rag_routes import router as rag_router
 from .api.metrics_routes import router as metrics_router
+from .api.auth import router as auth_router
+from .api.inbox import router as inbox_router
 from .database import engine, Base
 from .middleware.monitoring import LatencyMonitoringMiddleware
 
@@ -12,8 +14,8 @@ from .middleware.monitoring import LatencyMonitoringMiddleware
 # Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title="Multi-Agent Enterprise Knowledge Assistant",
-    description="FastAPI backend with LangGraph for enterprise knowledge management.",
+    title="Omnichannel Event AI Platform",
+    description="FastAPI backend with LangGraph for enterprise event management.",
     version="1.0.0"
 )
 
@@ -28,6 +30,8 @@ app.add_middleware(
 
 app.add_middleware(LatencyMonitoringMiddleware)
 
+app.include_router(auth_router, prefix="/api")
+app.include_router(inbox_router, prefix="/api")
 app.include_router(api_router, prefix="/api")
 app.include_router(rag_router, prefix="/api")
 app.include_router(metrics_router, prefix="/api")
