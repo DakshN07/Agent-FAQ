@@ -19,8 +19,11 @@ const integrationManager = require('./services/IntegrationManager');
 const connectDB = async () => {
   try {
     const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/agent-faq';
-    await mongoose.connect(mongoUri);
-    console.log(`✅ MongoDB Connected`);
+    await mongoose.connect(mongoUri, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true
+    });
+    console.log(`✅ MongoDB Connected to ${mongoUri}`);
 
     // Load integrations after successful DB connection
     await integrationManager.loadIntegrations();
