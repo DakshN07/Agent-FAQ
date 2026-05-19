@@ -9,6 +9,7 @@ class Organization(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
+    invite_code = Column(String, unique=True, index=True, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     users = relationship("User", back_populates="organization")
@@ -34,6 +35,11 @@ class Event(Base):
     org_id = Column(Integer, ForeignKey("organizations.id"))
     name = Column(String, index=True)
     description = Column(Text, nullable=True)
+    date = Column(String, nullable=True)
+    time = Column(String, nullable=True)
+    venue = Column(String, nullable=True)
+    event_type = Column(String, nullable=True)
+    goodies = Column(String, nullable=True)
     context = Column(Text, nullable=True) # Full unstructured context for RAG
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 

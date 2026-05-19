@@ -6,6 +6,7 @@ from .api.rag_routes import router as rag_router
 from .api.metrics_routes import router as metrics_router
 from .api.auth import router as auth_router
 from .api.inbox import router as inbox_router
+from .api.ai_events import router as ai_events_router
 from .database import engine, Base
 from .middleware.monitoring import LatencyMonitoringMiddleware
 
@@ -35,6 +36,7 @@ app.include_router(inbox_router, prefix="/api")
 app.include_router(api_router, prefix="/api")
 app.include_router(rag_router, prefix="/api")
 app.include_router(metrics_router, prefix="/api")
+app.include_router(ai_events_router, prefix="/api")
 
 if __name__ == "__main__":
     uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)

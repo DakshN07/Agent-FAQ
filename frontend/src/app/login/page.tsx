@@ -5,30 +5,30 @@ import { Sparkles, ArrowRight, Lock } from "lucide-react";
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-black text-white relative overflow-hidden">
       {/* Background Gradients */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-purple-500/20 blur-[120px]" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-blue-500/20 blur-[120px]" />
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-purple-600/20 blur-[120px] mix-blend-screen" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-blue-600/20 blur-[120px] mix-blend-screen" />
 
       <div className="w-full max-w-md p-8 relative z-10">
         <div className="flex flex-col items-center mb-10">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-foreground text-background shadow-2xl mb-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-blue-600 text-white shadow-lg shadow-purple-500/20 mb-4">
             <Sparkles className="h-6 w-6" />
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-center">Welcome back</h1>
-          <p className="text-muted-foreground mt-2 text-center text-sm">
-            Sign in to your Omnichannel Event account
+          <p className="text-gray-400 mt-2 text-center text-sm">
+            Sign in to your Agent-FAQ account
           </p>
         </div>
 
-        <div className="glass-card rounded-2xl p-8 space-y-6">
+        <div className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-8 space-y-6">
           <form className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+              <label className="text-sm font-medium text-gray-200">
                 Email
               </label>
               <input 
-                className="flex h-10 w-full rounded-md border border-border bg-background/50 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all focus:border-purple-500/50 focus:ring-purple-500/20"
+                className="flex h-10 w-full rounded-md border border-white/10 bg-black/50 px-3 py-2 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                 placeholder="you@company.com" 
                 type="email" 
                 required 
@@ -37,7 +37,7 @@ export default function LoginPage() {
             
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium leading-none">
+                <label className="text-sm font-medium text-gray-200">
                   Password
                 </label>
                 <Link href="#" className="text-xs text-purple-400 hover:text-purple-300">
@@ -46,25 +46,25 @@ export default function LoginPage() {
               </div>
               <div className="relative">
                 <input 
-                  className="flex h-10 w-full rounded-md border border-border bg-background/50 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all focus:border-purple-500/50 focus:ring-purple-500/20 pl-10"
+                  className="flex h-10 w-full rounded-md border border-white/10 bg-black/50 px-3 py-2 pl-10 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                   placeholder="••••••••" 
                   type="password" 
                   required 
                 />
-                <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Lock className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
               </div>
             </div>
 
-            <button className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-foreground text-background hover:bg-foreground/90 h-10 px-4 py-2 w-full mt-4 group shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_25px_rgba(255,255,255,0.2)]">
+            <button className="flex items-center justify-center w-full rounded-md bg-gradient-to-r from-purple-600 to-blue-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all mt-6 group">
               Sign In
               <ArrowRight className="ml-2 h-4 w-4 transform group-hover:translate-x-1 transition-transform" />
             </button>
           </form>
         </div>
 
-        <p className="text-center text-sm text-muted-foreground mt-8">
+        <p className="text-center text-sm text-gray-400 mt-8">
           Don't have an account?{" "}
-          <Link href="/register" className="text-foreground font-medium hover:underline">
+          <Link href="/register/org" className="text-white font-medium hover:underline">
             Register your organization
           </Link>
         </p>
