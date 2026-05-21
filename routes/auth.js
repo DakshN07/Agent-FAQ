@@ -11,7 +11,22 @@ const authValidation = require('../validations/auth.validation');
 // GET /api/auth/me
 router.get('/me', authenticate, async (req, res) => {
   try {
+    // Example of explicit Redis cache logic
+    const { redisClient } = require('../server'); // We will export redisClient from server.js
+    if (redisClient) {
+      const cachedUser = await redisClient.get(`user:${req.user.id}`);
+      if (cachedUser) {
+        return res.json(JSON.parse(cachedUser));
+      }
+    }
+
     const user = await User.findById(req.user.id).select('-password');
+    
+    if (redisClient && user) {
+      // Cache for 1 hour
+      await redisClient.setEx(`user:${req.user.id}`, 3600, JSON.stringify(user));
+    }
+    
     res.json(user);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -19,10 +34,17 @@ router.get('/me', authenticate, async (req, res) => {
 });
 
 // PUT /api/auth/me
-router.put('/me', authenticate, async (req, res) => {
+router.put('/me', authenticate, validate(authValidation.updateMe), async (req, res) => {
   try {
     const { phoneNumber, linkedinProfile } = req.body;
     const user = await User.findByIdAndUpdate(req.user.id, { phoneNumber, linkedinProfile }, { new: true }).select('-password');
+    
+    // Invalidate cache
+    const { redisClient } = require('../server');
+    if (redisClient) {
+      await redisClient.del(`user:${req.user.id}`);
+    }
+    
     res.json(user);
   } catch (err) {
     res.status(500).json({ error: err.message });

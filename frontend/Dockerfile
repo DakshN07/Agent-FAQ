@@ -1,29 +1,50 @@
-# Stage 1: Build the React application
-FROM node:20-alpine AS builder
+FROM node:20-alpine AS base
 
+# Install dependencies only when needed
+FROM base AS deps
 WORKDIR /app
-
-# Copy package files and install dependencies
-COPY package*.json ./
+COPY package.json package-lock.json* ./
 RUN npm ci
 
-# Copy source files and build
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Disable telemetry during the build.
+ENV NEXT_TELEMETRY_DISABLED 1
 RUN npm run build
 
-# Stage 2: Serve the application with Nginx
-FROM nginx:alpine AS production
+# Production image, copy all the files and run next
+FROM base AS runner
+WORKDIR /app
 
-# Copy the build output to replace the default nginx contents.
-# Adjust the build directory name if necessary (e.g., /app/dist or /app/.next)
-# For Next.js static export: COPY --from=builder /app/out /usr/share/nginx/html
-# For Create React App: COPY --from=builder /app/build /usr/share/nginx/html
+ENV NODE_ENV production
+ENV NEXT_TELEMETRY_DISABLED 1
 
-# Assuming Next.js standalone output or static HTML
-COPY --from=builder /app/out /usr/share/nginx/html
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
 
-# Expose port 80
+COPY --from=builder /app/public ./public
+
+# Set the correct permission for prerender cache
+RUN mkdir .next
+RUN chown nextjs:nodejs .next
+
+# Automatically leverage output traces to reduce image size
+# https://nextjs.org/docs/advanced-features/output-file-tracing
+# COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+# COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# If not using standalone, copy all:
+COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
+
+USER nextjs
+
 EXPOSE 80
+ENV PORT 80
+ENV HOSTNAME "0.0.0.0"
 
-# Start Nginx server
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["npm", "start"]

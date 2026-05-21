@@ -157,3 +157,4 @@ process.on('SIGTERM', gracefulShutdown);
 process.on('SIGINT', gracefulShutdown);
 
 module.exports = app;
+module.exports.redisClient = redisClient;

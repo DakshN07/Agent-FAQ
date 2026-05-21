@@ -11,7 +11,13 @@ const login = joi.object({
   password: joi.string().required(),
 });
 
+const updateMe = joi.object({
+  phoneNumber: joi.string().optional(),
+  linkedinProfile: joi.string().uri().optional(),
+});
+
 module.exports = {
   register,
   login,
+  updateMe,
 };
