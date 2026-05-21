@@ -5,6 +5,8 @@ const User = require('../models/User');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_jwt_key';
 const { authenticate } = require('../middleware/auth');
+const validate = require('../middleware/validate');
+const authValidation = require('../validations/auth.validation');
 
 // GET /api/auth/me
 router.get('/me', authenticate, async (req, res) => {
@@ -27,14 +29,39 @@ router.put('/me', authenticate, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/auth/register:
+ *   post:
+ *     summary: Register a new user
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - username
+ *               - email
+ *               - password
+ *             properties:
+ *               username:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: User created
+ *       400:
+ *         description: Validation error
+ */
 // POST /api/auth/register
-router.post('/register', async (req, res) => {
+router.post('/register', validate(authValidation.register), async (req, res) => {
   try {
     const { username, email, password } = req.body;
-
-    if (!username || !email || !password) {
-      return res.status(400).json({ error: 'Please provide all fields' });
-    }
 
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) {
@@ -56,14 +83,36 @@ router.post('/register', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Log in a user
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *       401:
+ *         description: Invalid credentials
+ */
 // POST /api/auth/login
-router.post('/login', async (req, res) => {
+router.post('/login', validate(authValidation.login), async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Please provide email and password' });
-    }
 
     const user = await User.findOne({ email });
     if (!user) {

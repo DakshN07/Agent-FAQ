@@ -21,12 +21,17 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # Copy built artifacts from the builder stage
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package*.json ./
+# For production, we re-install only production dependencies to save space
+COPY package*.json ./
+RUN npm ci --omit=dev
+
 COPY --from=builder /app ./
+
+# Use non-root user for security
+USER node
 
 # Expose the application port
 EXPOSE 3000
 
-# Start the Node.js application
-CMD ["node", "server.js"]
+# Start the Node.js application using npm start to trigger prestart validation
+CMD ["npm", "start"]
