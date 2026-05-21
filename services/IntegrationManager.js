@@ -136,11 +136,11 @@ class IntegrationManager {
                 if (adapter) {
                     await adapter.sendMessage(channelId, bestMatch.answer);
                 }
-                return;
+                return { matched: true, answer: bestMatch.answer };
             }
 
             // 4. Handle Unknown
-            await this.handleUnknown(normalizedMsg);
+            return await this.handleUnknown(normalizedMsg);
 
         } catch (err) {
             console.error("Error in unified message handler:", err);
@@ -175,10 +175,12 @@ class IntegrationManager {
         console.log(`[Unknown/Handoff] Logged: "${text}" x${unknownSession.count}`);
         
         // Auto-reply to let them know it's being reviewed by a human
+        const handoffMessage = "I'm not quite sure about that yet, but I've escalated your question to my human team. They will get back to you shortly!";
         const adapter = this.getAdapter(eventId, sourcePlatform);
         if (adapter) {
-            await adapter.sendMessage(channelId, "I'm not quite sure about that yet, but I've escalated your question to my human team. They will get back to you shortly!");
+            await adapter.sendMessage(channelId, handoffMessage);
         }
+        return { matched: false, answer: handoffMessage };
     }
 
 }

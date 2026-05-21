@@ -4,29 +4,62 @@ const options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'Agent-FAQ API',
+      title: 'FAQ Discord Bot API',
       version: '1.0.0',
-      description: 'API Documentation for Agent-FAQ backend',
+      description: 'AI-powered FAQ management system with Discord bot integration',
+      contact: {
+        name: 'API Support',
+        email: 'support@example.com',
+      },
     },
     servers: [
       {
         url: 'http://localhost:3000',
-        description: 'Development server',
+        description: 'Development Server',
+      },
+      {
+        url: 'https://api.example.com',
+        description: 'Production Server',
       },
     ],
     components: {
       securitySchemes: {
-        bearerAuth: {
+        BearerAuth: {
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'JWT',
         },
       },
+      schemas: {
+        User: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            username: { type: 'string' },
+            email: { type: 'string' },
+            role: { type: 'string', enum: ['user', 'admin', 'moderator'] },
+            phoneNumber: { type: 'string' },
+            linkedinProfile: { type: 'string' },
+            createdAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        Error: {
+          type: 'object',
+          properties: {
+            error: { type: 'string' },
+            code: { type: 'integer' },
+          },
+        },
+      },
     },
+    tags: [
+      { name: 'Auth', description: 'Authentication endpoints' },
+      { name: 'Health', description: 'Health check endpoints' },
+    ],
   },
-  apis: ['./routes/*.js'], // Files containing annotations as above
+  apis: ['./routes/*.js'],
 };
 
-const specs = swaggerJsdoc(options);
+const swaggerSpecs = swaggerJsdoc(options);
 
-module.exports = specs;
+module.exports = swaggerSpecs;

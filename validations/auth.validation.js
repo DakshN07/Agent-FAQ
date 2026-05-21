@@ -12,8 +12,8 @@ const login = joi.object({
 });
 
 const updateMe = joi.object({
-  phoneNumber: joi.string().optional(),
-  linkedinProfile: joi.string().uri().optional(),
+  phoneNumber: joi.string().optional().allow(''),
+  linkedinProfile: joi.string().optional().allow(''),
 });
 
 module.exports = {
