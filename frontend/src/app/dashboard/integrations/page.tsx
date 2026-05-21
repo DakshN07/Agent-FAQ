@@ -22,7 +22,24 @@ const INTEGRATIONS = [
     description: "Embed a beautiful chat widget directly on your event website.",
     icon: Code2,
     color: "text-emerald-400 bg-emerald-400/10",
-    status: "available"
+    status: "available",
+    action: "widget"
+  },
+  {
+    name: "Telegram",
+    description: "Connect your Telegram Bot to answer users on mobile.",
+    icon: MessageCircle,
+    color: "text-sky-400 bg-sky-400/10",
+    status: "available",
+    action: "oauth"
+  },
+  {
+    name: "WhatsApp",
+    description: "Deploy the agent to a WhatsApp Business account.",
+    icon: MessageSquare,
+    color: "text-green-500 bg-green-500/10",
+    status: "available",
+    action: "oauth"
   }
 ];
 
@@ -53,7 +70,17 @@ export default function IntegrationsPage() {
                 Connected
               </button>
             ) : (
-              <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-foreground text-background hover:bg-foreground/90 text-sm font-medium transition-colors">
+              <button 
+                onClick={() => {
+                    const eventId = "PLACEHOLDER_EVENT_ID"; // In real app, get from Context
+                    if (app.action === 'widget') {
+                        alert(`<!-- Add this to your website's <head> -->\n<script src="http://localhost:5173/widget.js" data-event-id="${eventId}"></script>`);
+                    } else {
+                        window.location.href = `http://localhost:3000/api/oauth/${app.name.toLowerCase()}?state=${eventId}`;
+                    }
+                }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-foreground text-background hover:bg-foreground/90 text-sm font-medium transition-colors"
+              >
                 Connect
                 <ArrowRight className="w-4 h-4" />
               </button>

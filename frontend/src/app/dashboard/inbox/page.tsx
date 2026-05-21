@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   CheckCircle2, 
   MessageSquare, 
@@ -12,42 +12,53 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const MOCK_QUERIES = [
-  {
-    id: "1",
-    user: "Alex Johnson",
-    platform: "Slack",
-    query: "What time does the keynote start tomorrow?",
-    status: "pending",
-    time: "10m ago",
-    aiDraft: "The keynote presentation starts at 9:00 AM PST tomorrow in the Main Hall. Please arrive 15 minutes early for seating.",
-    confidence: 98,
-  },
-  {
-    id: "2",
-    user: "Sarah Smith",
-    platform: "Discord",
-    query: "Is there vegetarian food available at the lunch break?",
-    status: "pending",
-    time: "15m ago",
-    aiDraft: "Yes, we have a variety of vegetarian and vegan options available during the catered lunch at 12:30 PM.",
-    confidence: 95,
-  },
-  {
-    id: "3",
-    user: "Mike T.",
-    platform: "Website Widget",
-    query: "Can I get a refund if I can't make it?",
-    status: "pending",
-    time: "1h ago",
-    aiDraft: "I'm sorry, but tickets are non-refundable within 48 hours of the event. However, you can transfer your ticket to another person.",
-    confidence: 82,
-  }
-];
-
 export default function InboxPage() {
-  const [selectedQuery, setSelectedQuery] = useState(MOCK_QUERIES[0]);
-  const [draftText, setDraftText] = useState(selectedQuery.aiDraft);
+  const [queries, setQueries] = useState<any[]>([]);
+  const [selectedQuery, setSelectedQuery] = useState<any>(null);
+  const [draftText, setDraftText] = useState("");
+  const eventId = "PLACEHOLDER_EVENT_ID"; // In real app, get from Context
+
+  useEffect(() => {
+    fetch(`http://localhost:3000/api/unknown-questions?eventId=${eventId}`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+            const formatted = data.map(q => ({
+                id: q._id,
+                user: "User",
+                platform: q.sourcePlatform,
+                query: q.text,
+                status: q.handoffStatus,
+                time: new Date(q.lastAskedAt || q.firstAskedAt).toLocaleTimeString(),
+                aiDraft: "I'm sorry, I don't have an answer for that yet. Can I help you with anything else?",
+                confidence: 0
+            }));
+            setQueries(formatted);
+            if (formatted.length > 0) {
+                setSelectedQuery(formatted[0]);
+                setDraftText(formatted[0].aiDraft);
+            }
+        }
+      })
+      .catch(console.error);
+  }, [eventId]);
+
+  const handleApprove = async () => {
+    if (!selectedQuery) return;
+    try {
+        await fetch(`http://localhost:3000/api/unknown-questions/${selectedQuery.id}/answer`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ answer: draftText })
+        });
+        setQueries(q => q.filter(item => item.id !== selectedQuery.id));
+        setSelectedQuery(null);
+        setDraftText("");
+        alert("Answer sent and saved to FAQ!");
+    } catch (e) {
+        alert("Failed to send answer");
+    }
+  };
 
   return (
     <div className="h-[calc(100vh-8rem)] flex gap-6">
@@ -58,12 +69,12 @@ export default function InboxPage() {
           <h2 className="font-semibold flex items-center justify-between">
             Pending Approvals
             <span className="bg-accent text-accent-foreground text-xs px-2 py-1 rounded-full">
-              {MOCK_QUERIES.length}
+              {queries.length}
             </span>
           </h2>
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-2">
-          {MOCK_QUERIES.map((q) => (
+          {queries.map((q) => (
             <button
               key={q.id}
               onClick={() => {
@@ -154,7 +165,7 @@ export default function InboxPage() {
             <button className="flex-1 bg-background border border-border hover:bg-muted text-foreground py-2.5 rounded-lg text-sm font-medium transition-colors">
               Reject
             </button>
-            <button className="flex-1 bg-foreground text-background hover:bg-foreground/90 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-lg">
+            <button onClick={handleApprove} className="flex-1 bg-foreground text-background hover:bg-foreground/90 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-lg">
               <CheckCircle2 className="w-4 h-4" />
               Approve & Send
             </button>
