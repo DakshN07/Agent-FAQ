@@ -2,8 +2,20 @@
 
 import Link from "next/link";
 import { Sparkles, ArrowRight, Lock } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Simulate real authentication by storing user details
+    const name = email.split('@')[0] || "User";
+    localStorage.setItem('user', JSON.stringify({ name, email, plan: 'Free Tier' }));
+    router.push("/dashboard");
+  };
   return (
     <div className="min-h-screen flex items-center justify-center bg-black text-white relative overflow-hidden">
       {/* Background Gradients */}
@@ -22,7 +34,7 @@ export default function LoginPage() {
         </div>
 
         <div className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-8 space-y-6">
-          <form className="space-y-4">
+          <form className="space-y-4" onSubmit={handleLogin}>
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-200">
                 Email
@@ -31,6 +43,8 @@ export default function LoginPage() {
                 className="flex h-10 w-full rounded-md border border-white/10 bg-black/50 px-3 py-2 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                 placeholder="you@company.com" 
                 type="email" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required 
               />
             </div>

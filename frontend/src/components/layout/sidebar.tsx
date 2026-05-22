@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { 
   Inbox, 
@@ -22,6 +23,22 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [user, setUser] = useState<{name: string, org?: string, plan: string} | null>(null);
+
+  useEffect(() => {
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (e) {
+        console.error("Failed to parse user data", e);
+      }
+    }
+  }, []);
+
+  const displayName = user?.org || user?.name || "Guest";
+  const displayPlan = user?.plan || "Free Tier";
+  const initials = displayName.charAt(0).toUpperCase();
 
   return (
     <div className="flex h-screen w-64 flex-col border-r border-border bg-background/50 backdrop-blur-xl">
@@ -64,10 +81,12 @@ export function Sidebar() {
 
       <div className="p-4 border-t border-border/50">
         <div className="flex items-center gap-3 rounded-lg px-3 py-2 transition-all hover:bg-muted">
-          <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 text-white font-bold">
+            {initials}
+          </div>
           <div className="flex flex-col">
-            <span className="text-sm font-medium">Acme Events</span>
-            <span className="text-xs text-muted-foreground">Pro Plan</span>
+            <span className="text-sm font-medium">{displayName}</span>
+            <span className="text-xs text-muted-foreground">{displayPlan}</span>
           </div>
         </div>
       </div>

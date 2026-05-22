@@ -83,7 +83,7 @@ export default function InboxPage() {
               }}
               className={cn(
                 "w-full text-left p-4 rounded-lg transition-all duration-200 border",
-                selectedQuery.id === q.id 
+                selectedQuery?.id === q.id 
                   ? "bg-accent/20 border-accent text-accent-foreground" 
                   : "bg-background border-transparent hover:border-border"
               )}
@@ -121,24 +121,32 @@ export default function InboxPage() {
           </button>
         </div>
         <div className="flex-1 p-6 flex flex-col">
-          <div className="flex items-start gap-4 mb-8">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
-              {selectedQuery.user.charAt(0)}
+          {selectedQuery ? (
+            <>
+              <div className="flex items-start gap-4 mb-8">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
+                  {selectedQuery.user.charAt(0)}
+                </div>
+                <div>
+                  <h3 className="font-medium">{selectedQuery.user}</h3>
+                  <p className="text-sm text-muted-foreground">User on {selectedQuery.platform}</p>
+                </div>
+              </div>
+              
+              <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                <div className="text-xs text-muted-foreground mb-2 flex items-center gap-2">
+                  <MessageSquare className="w-3 h-3" /> Incoming Message
+                </div>
+                <p className="text-sm font-medium leading-relaxed">
+                  "{selectedQuery.query}"
+                </p>
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
+              No query selected
             </div>
-            <div>
-              <h3 className="font-medium">{selectedQuery.user}</h3>
-              <p className="text-sm text-muted-foreground">User on {selectedQuery.platform}</p>
-            </div>
-          </div>
-          
-          <div className="bg-muted/50 rounded-lg p-4 border border-border">
-            <div className="text-xs text-muted-foreground mb-2 flex items-center gap-2">
-              <MessageSquare className="w-3 h-3" /> Incoming Message
-            </div>
-            <p className="text-sm font-medium leading-relaxed">
-              "{selectedQuery.query}"
-            </p>
-          </div>
+          )}
         </div>
       </div>
 
@@ -157,15 +165,16 @@ export default function InboxPage() {
             <textarea 
               value={draftText}
               onChange={(e) => setDraftText(e.target.value)}
-              className="w-full h-full min-h-[200px] bg-background border border-border rounded-lg p-4 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
+              disabled={!selectedQuery}
+              className="w-full h-full min-h-[200px] bg-background border border-border rounded-lg p-4 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all disabled:opacity-50"
             />
           </div>
           
           <div className="flex gap-3 pt-4 border-t border-border mt-auto">
-            <button className="flex-1 bg-background border border-border hover:bg-muted text-foreground py-2.5 rounded-lg text-sm font-medium transition-colors">
+            <button disabled={!selectedQuery} className="flex-1 bg-background border border-border hover:bg-muted text-foreground py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
               Reject
             </button>
-            <button onClick={handleApprove} className="flex-1 bg-foreground text-background hover:bg-foreground/90 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-lg">
+            <button onClick={handleApprove} disabled={!selectedQuery} className="flex-1 bg-foreground text-background hover:bg-foreground/90 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
               <CheckCircle2 className="w-4 h-4" />
               Approve & Send
             </button>

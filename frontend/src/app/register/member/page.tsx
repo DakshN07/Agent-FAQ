@@ -13,8 +13,14 @@ export default function RegisterMemberPage() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate API call to /api/auth/register/member
-    // router.push("/dashboard/events");
+    // Simulate API call and save user details
+    const name = email.split('@')[0] || "Member";
+    localStorage.setItem('user', JSON.stringify({ 
+      name: name, 
+      email: email, 
+      plan: 'Team Member'
+    }));
+    router.push("/dashboard/events");
   };
 
   return (

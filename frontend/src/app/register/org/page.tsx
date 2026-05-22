@@ -14,8 +14,14 @@ export default function RegisterOrgPage() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate API call to /api/auth/register/org
-    // router.push("/dashboard/events/create");
+    // Simulate API call and save user details
+    localStorage.setItem('user', JSON.stringify({ 
+      name: adminName, 
+      org: orgName, 
+      email: email, 
+      plan: 'Pro Plan' // Giving them pro plan upon org registration!
+    }));
+    router.push("/dashboard/events/create");
   };
 
   return (

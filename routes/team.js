@@ -35,33 +35,48 @@ router.get('/', async (req, res) => {
     }
 });
 
-// POST invite/add team member (Simplified: directly adding if email exists)
-router.post('/', async (req, res) => {
+const { sendTeamInvite } = require('../services/emailService');
+
+// POST invite/add team member
+router.post('/invite', async (req, res) => {
     try {
         const { email, role, platformAccess } = req.body;
+        const orgName = req.event.name || "Agent-FAQ Organization"; // fallback name
 
-        // Find user by email
-        const userToInvite = await User.findOne({ email });
-        if (!userToInvite) {
-            return res.status(404).json({ error: 'User with this email not found in the system' });
+        // Check if member already exists
+        let member = await EventMember.findOne({ eventId: req.params.eventId, email });
+        
+        if (member) {
+            if (member.status === 'Active') {
+                return res.status(400).json({ error: 'User is already an active team member' });
+            }
+            // If pending or removed, update status to pending and re-send invite
+            member.status = 'Pending';
+            member.role = role || member.role;
+            member.platformAccess = platformAccess || member.platformAccess;
+            await member.save();
+        } else {
+            // Find if user already has an account to link it immediately, otherwise wait for signup
+            const user = await User.findOne({ email });
+            member = new EventMember({
+                eventId: req.params.eventId,
+                userId: user ? user._id : null,
+                email: email,
+                role: role || 'agent',
+                status: 'Pending',
+                platformAccess: platformAccess || []
+            });
+            await member.save();
         }
 
-        const newMember = new EventMember({
-            eventId: req.params.eventId,
-            userId: userToInvite._id,
-            role: role || 'agent',
-            platformAccess: platformAccess || []
-        });
+        // Send email
+        const emailResult = await sendTeamInvite(email, orgName, req.params.eventId);
+        if (!emailResult.success) {
+            console.error("Failed to send invite email:", emailResult.error);
+        }
 
-        await newMember.save();
-
-        // Return populated data
-        const populatedMember = await EventMember.findById(newMember._id).populate('userId', 'username email');
-        res.status(201).json(populatedMember);
+        res.status(201).json({ message: 'Invitation sent successfully', member });
     } catch (error) {
-        if (error.code === 11000) {
-            return res.status(400).json({ error: 'User is already a team member' });
-        }
         res.status(500).json({ error: error.message });
     }
 });
@@ -86,9 +101,13 @@ router.put('/:memberId', async (req, res) => {
 // DELETE remove team member
 router.delete('/:memberId', async (req, res) => {
     try {
-        const member = await EventMember.findOneAndDelete({ _id: req.params.memberId, eventId: req.params.eventId });
+        const member = await EventMember.findOneAndUpdate(
+            { _id: req.params.memberId, eventId: req.params.eventId },
+            { $set: { status: 'Removed' } },
+            { new: true }
+        );
         if (!member) return res.status(404).json({ error: 'Member not found' });
-        res.json({ message: 'Team member removed' });
+        res.json({ message: 'Team member removed', member });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

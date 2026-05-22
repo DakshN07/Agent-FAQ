@@ -1,6 +1,6 @@
-#  FAQ Agent — Smart Discord FAQ Bot
+#  FAQ Agent — Smart Omnichannel FAQ Bot
 
-> **A full-stack FAQ management system with AI-powered semantic matching, built with React, Node.js, and MongoDB.**
+> **A full-stack FAQ management system with AI-powered semantic matching, built with Next.js, Node.js, and MongoDB. (Includes integrations for Discord, Slack, Telegram, and WhatsApp)**
 
 [![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=flat&logo=vercel)](https://vercel.com)
 [![Backend on Render](https://img.shields.io/badge/Backend%20on-Render-00ADD8?style=flat&logo=render)](https://render.com)
@@ -9,6 +9,7 @@
 ## 📋 Table of Contents
 
 - [ Features](#-features)
+- [ Current Status & Remaining Work](#-current-status--remaining-work)
 - [ Tech Stack](#️-tech-stack)
 - [ Project Structure](#-project-structure)
 - [ Live Demo](#-live-demo)
@@ -24,6 +25,10 @@
 ---
 
 ##  Features
+
+###  **Omnichannel Support**
+- **Multiple Platforms**: Native adapters for Discord, Slack, Telegram, and WhatsApp.
+- **Unified Management**: Manage FAQs for all platforms from a single dashboard.
 
 ###  **AI-Powered FAQ Matching**
 - **Semantic Similarity**: Uses embeddings to understand user intent
@@ -52,14 +57,35 @@
 
 ---
 
+## 🚧 Current Status & Remaining Work
+
+The project is currently undergoing a frontend migration from a legacy Vite/React application (`frontend-old`) to a modern Next.js (App Router) application (`frontend`).
+
+**Implemented in New Next.js Frontend:**
+- Authentication (Login / Register)
+- Dashboard Layout & Routing
+- Inbox View
+- Events View
+- Integrations View
+
+**Remaining Functionality to Migrate (Pending):**
+- **FAQ Management**: Interface to Add, Edit, and Delete FAQs
+- **Analytics Dashboard**: Real-time statistics, charts, and activity tracking
+- **Settings Configuration**: App-wide similarity threshold and auto-response settings
+- **User/Team Management**: Role-based access and team invitations
+- **Profile Management**: User profile settings
+- **AI Suggestions View**: Reviewing and approving AI-generated answers for unknown questions
+
+---
+
 ##  Tech Stack
 
-### **Frontend**
--  **React 19** — Modern UI framework
--  **Tailwind CSS** — Utility-first styling
--  **Vite** — Fast build tool
--  **React Router** — Client-side routing
--  **React Hot Toast** — Beautiful notifications
+### **Frontend (Next.js)**
+-  **Next.js 15 (App Router)** — Modern React framework
+-  **Tailwind CSS v4** — Utility-first styling
+-  **TypeScript** — Type safety
+-  **Framer Motion** — Fluid animations
+-  **Lucide React** — Beautiful iconography
 
 ### **Backend**
 -  **Node.js** — JavaScript runtime
@@ -82,36 +108,21 @@
 
 ##  Project Structure
 
-```
+```text
 Agent-FAQ/
-├── 📁 frontend/                 # React frontend application
-│   ├── 📁 components/          # Reusable UI components
-│   ├── 📁 pages/              # Page components
-│   ├── 📁 src/                # Source files
-│   ├── package.json           # Frontend dependencies
-│   └── vite.config.js         # Vite configuration
-├── 📁 api/                    # API route handlers
-│   ├── login.js              # Authentication
-│   ├── settings.js           # App settings
-│   ├── suggestions.js        # AI suggestions
-│   ├── accept-invite.js      # Team invitations
-│   └── ai-suggest.js         # AI generation
-├── 📁 models/                # Database models
-│   ├── User.js              # User schema
-│   ├── Faq.js               # FAQ schema
-│   ├── Settings.js          # Settings schema
-│   ├── Analytics.js         # Analytics schema
-│   └── TeamMember.js        # Team member schema
-├── 📁 backend/              # Core backend logic
-│   ├── embedding.js         # AI embeddings
-│   ├── similarity.js        # Semantic matching
-│   └── db.js               # Database utilities
-├── 📁 utils/               # Utility functions
-│   ├── sendEmail.js        # Email functionality
-│   └── db.js              # Database helpers
-├── server.js              # Main server file
-├── package.json           # Backend dependencies
-└── README.md             # This file
+├── 📁 adapters/               # Integration adapters (Discord, Slack, Telegram, Whatsapp)
+├── 📁 backend/                # Core AI logic (embedding, similarity)
+├── 📁 config/                 # Environment and app configuration
+├── 📁 frontend/               # Next.js frontend application (Active)
+├── 📁 frontend-old/           # Vite React frontend (Legacy)
+├── 📁 models/                 # Database models (Mongoose)
+├── 📁 routes/                 # Express API routes
+├── 📁 services/               # Core business logic (IntegrationManager)
+├── 📁 middleware/             # Express middlewares (auth, error handling)
+├── 📁 utils/                  # Utility functions (logger, email)
+├── server.js                  # Main Express server file
+├── package.json               # Backend dependencies
+└── README.md                  # This file
 ```
 
 ---
