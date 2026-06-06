@@ -6,13 +6,16 @@ const Event = require('../models/Event');
 // Get Widget Settings (Color, Name, etc.)
 router.get('/settings/:eventId', async (req, res) => {
     try {
+        if (!req.params.eventId || req.params.eventId === 'null' || req.params.eventId === 'undefined') {
+            return res.status(400).json({ error: 'Valid Event ID is required' });
+        }
         const event = await Event.findById(req.params.eventId);
         if (!event) return res.status(404).json({ error: 'Event not found' });
         
         res.json({
-            name: event.name,
+            name: event.name || 'Agent',
             themeColor: '#3b82f6', // Default blue, can be customized later
-            botName: `${event.name} FAQ Agent`
+            botName: event.name ? `${event.name} FAQ Agent` : 'FAQ Agent'
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -23,9 +26,11 @@ router.get('/settings/:eventId', async (req, res) => {
 router.post('/chat/:eventId', async (req, res) => {
     try {
         const { eventId } = req.params;
-        const { text, userId } = req.body; // userId is a unique session ID from the browser
+        const { text, userId } = req.body || {}; // userId is a unique session ID from the browser
 
+        if (!eventId || eventId === 'null' || eventId === 'undefined') return res.status(400).json({ error: 'Valid Event ID is required' });
         if (!text) return res.status(400).json({ error: 'Message text is required' });
+        if (!userId) return res.status(400).json({ error: 'User ID is required' });
 
         // Normalize message for IntegrationManager
         const normalizedMsg = {

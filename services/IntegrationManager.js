@@ -107,7 +107,10 @@ class IntegrationManager {
 
             // 3. Match using similarity
             const userEmbedding = await getEmbedding(text);
-            if (!userEmbedding) return;
+            if (!userEmbedding) {
+                console.warn(`[${eventId}] Failed to get embedding for text: "${text}"`);
+                return await this.handleUnknown(normalizedMsg, []);
+            }
 
             let bestMatch = null;
             let bestScore = 0.0;
@@ -123,7 +126,7 @@ class IntegrationManager {
             // We'll use a standard threshold for now, or fetch from Event model
             const THRESHOLD = 0.85;
 
-            if (bestScore >= THRESHOLD) {
+            if (bestMatch && bestScore >= THRESHOLD) {
                 console.log(`[Match] score ${bestScore.toFixed(2)} for: "${bestMatch.question}"`);
                 await Analytics.updateOne(
                     { eventId, platform: sourcePlatform },

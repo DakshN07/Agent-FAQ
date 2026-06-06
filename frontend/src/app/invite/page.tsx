@@ -33,8 +33,8 @@ function InviteContent() {
       if (payloadBase64) {
         const payload = JSON.parse(atob(payloadBase64));
         setInviteData({
-          email: payload.email || "colleague@example.com",
-          organization: payload.organization || "Agent-FAQ Organization"
+          email: payload?.email || "colleague@example.com",
+          organization: payload?.organization || "Agent-FAQ Organization"
         });
       } else {
         // Mock payload if token is just a random string

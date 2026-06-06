@@ -22,14 +22,14 @@ export default function InboxPage() {
     fetch(`http://localhost:3000/api/unknown-questions?eventId=${eventId}`)
       .then(res => res.json())
       .then(data => {
-        if (Array.isArray(data)) {
-            const formatted = data.map(q => ({
+        if (data && Array.isArray(data)) {
+            const formatted = data.filter(q => q != null).map(q => ({
                 id: q._id,
                 user: "User",
-                platform: q.sourcePlatform,
-                query: q.text,
-                status: q.handoffStatus,
-                time: new Date(q.lastAskedAt || q.firstAskedAt).toLocaleTimeString(),
+                platform: q.sourcePlatform || "unknown",
+                query: q.text || "",
+                status: q.handoffStatus || "pending",
+                time: new Date(q.lastAskedAt || q.firstAskedAt || Date.now()).toLocaleTimeString(),
                 aiDraft: "I'm sorry, I don't have an answer for that yet. Can I help you with anything else?",
                 confidence: 0
             }));

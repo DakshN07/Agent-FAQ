@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: agent-faq-backend
+    env: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: MONGO_URI
+        sync: false
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
