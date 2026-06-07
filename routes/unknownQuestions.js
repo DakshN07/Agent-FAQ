@@ -44,20 +44,9 @@ router.post('/:id/answer', async (req, res) => {
       }
     }
 
-    // 2. Create FAQ
-    const Faq = require('../models/Faq');
-    const { getEmbedding } = require('../services/embedding');
-    const embedding = await getEmbedding(unknown.text);
-
-    const newFaq = new Faq({
-      eventId: unknown.eventId,
-      question: unknown.text,
-      answer: answer,
-      embedding: embedding,
-      platforms: [unknown.sourcePlatform],
-      answeredBy: req.user.id
-    });
-    await newFaq.save();
+    // 2. Create FAQ using Learning Agent
+    const { runLearningAgent } = require('../services/langgraph/agents/learning');
+    await runLearningAgent(unknown.eventId, unknown.text, answer, unknown.sourcePlatform, req.user ? req.user.id : null);
 
     // 3. Delete UnknownQuestion
     await UnknownQuestion.findByIdAndDelete(unknown._id);

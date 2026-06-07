@@ -76,114 +76,94 @@ class IntegrationManager {
     }
 
     /**
-     * Unified message handler across all platforms
+     * Unified message handler across all platforms using LangGraph
      */
     async handleIncomingMessage(normalizedMsg) {
         const { eventId, sourcePlatform, channelId, userId, text } = normalizedMsg;
         console.log(`[${eventId}][${sourcePlatform}] Message from ${userId}: ${text}`);
 
         try {
-            // 1. Log query attempt
-            await Analytics.updateOne(
-                { eventId, platform: sourcePlatform },
-                { $inc: { matched: 0 } },
-                { upsert: true }
-            );
+            // 1. Log Conversation & Message
+            const Conversation = require('../models/Conversation');
+            const Message = require('../models/Message');
+            
+            let conversation = await Conversation.findOne({ eventId, channelId, platform: sourcePlatform });
+            if (!conversation) {
+                conversation = await Conversation.create({
+                    eventId,
+                    userId,
+                    platform: sourcePlatform,
+                    channelId,
+                    status: 'Pending'
+                });
+            } else {
+                conversation.lastMessageAt = Date.now();
+                await conversation.save();
+            }
 
-            // 2. Fetch FAQs for this Event — include platform-specific AND global FAQs (empty platforms array)
-            const faqs = await Faq.find({ 
-                eventId, 
-                $or: [
-                    { platforms: sourcePlatform },
-                    { platforms: { $size: 0 } },
-                    { platforms: { $exists: false } }
-                ]
+            await Message.create({
+                conversationId: conversation._id,
+                text,
+                senderType: 'User',
+                senderId: userId
             });
-            console.log(`[${eventId}] Found ${faqs.length} FAQs for matching`);
-            if (!faqs.length) {
-                // If no FAQs for the event, we can't answer. Add direct to unknown.
-                return await this.handleUnknown(normalizedMsg);
+
+            // 2. Invoke LangGraph Workflow
+            const { createSupportWorkflow } = require('./langgraph/workflow');
+            const workflow = createSupportWorkflow();
+
+            const initialState = {
+                messages: [{ role: 'user', content: text }],
+                conversationId: conversation._id,
+                userId,
+                eventId,
+                platform: sourcePlatform,
+                nextAgent: null,
+                isFlagged: false,
+                confidenceScore: 0.0,
+                finalAnswer: null
+            };
+
+            const finalState = await workflow.invoke(initialState);
+
+            // 3. Handle Workflow Result
+            let replyMessage = finalState.finalAnswer;
+            
+            if (finalState.isFlagged) {
+                // Do not respond, or respond neutrally
+                replyMessage = "I cannot process this request.";
+                conversation.status = 'Spam';
+            } else if (finalState.confidenceScore >= 0.85) {
+                conversation.status = 'Answered';
+            } else {
+                conversation.status = 'Escalated';
             }
+            await conversation.save();
 
-            // 3. Match using similarity
-            const userEmbedding = await getEmbedding(text);
-            if (!userEmbedding) {
-                console.warn(`[${eventId}] Failed to get embedding for text: "${text}"`);
-                return await this.handleUnknown(normalizedMsg, []);
-            }
-
-            let bestMatch = null;
-            let bestScore = 0.0;
-            for (const faq of faqs) {
-                if (!faq.embedding) continue;
-                const score = cosineSimilarity(userEmbedding, faq.embedding);
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestMatch = faq;
-                }
-            }
-
-            // We'll use a standard threshold for now, or fetch from Event model
-            const THRESHOLD = 0.85;
-
-            if (bestMatch && bestScore >= THRESHOLD) {
-                console.log(`[Match] score ${bestScore.toFixed(2)} for: "${bestMatch.question}"`);
-                await Analytics.updateOne(
-                    { eventId, platform: sourcePlatform },
-                    { $inc: { matched: 1 } },
-                    { upsert: true }
-                );
+            // Save AI Message
+            if (replyMessage) {
+                await Message.create({
+                    conversationId: conversation._id,
+                    text: replyMessage,
+                    senderType: 'Agent',
+                    senderId: 'FAQ_Agent',
+                    confidence: finalState.confidenceScore,
+                    flags: finalState.isFlagged ? [finalState.toxicityType] : []
+                });
 
                 // Send back via adapter
                 const adapter = this.getAdapter(eventId, sourcePlatform);
                 if (adapter) {
-                    await adapter.sendMessage(channelId, bestMatch.answer);
+                    await adapter.sendMessage(channelId, replyMessage);
                 }
-                return { matched: true, answer: bestMatch.answer };
             }
 
-            // 4. Handle Unknown
-            return await this.handleUnknown(normalizedMsg);
+            return { matched: finalState.confidenceScore >= 0.85, answer: replyMessage };
 
         } catch (err) {
-            console.error("Error in unified message handler:", err);
+            console.error("Error in LangGraph unified message handler:", err);
+            return { matched: false, answer: "An error occurred while processing your message." };
         }
-    }
-
-    async handleUnknown(normalizedMsg, userEmbedding) {
-        const { eventId, sourcePlatform, channelId, userId, text } = normalizedMsg;
-
-        let unknownSession = await UnknownQuestion.findOne({ eventId, text });
-        if (!unknownSession) {
-            unknownSession = new UnknownQuestion({
-                eventId,
-                text,
-                embedding: userEmbedding || [],
-                count: 1,
-                sourcePlatform,
-                channelId,
-                isHandoffRequested: true,
-                handoffStatus: 'pending'
-            });
-        } else {
-            unknownSession.count += 1;
-            unknownSession.lastAskedAt = Date.now();
-            unknownSession.sourcePlatform = sourcePlatform;
-            unknownSession.channelId = channelId;
-            unknownSession.isHandoffRequested = true;
-            unknownSession.handoffStatus = 'pending';
-        }
-        await unknownSession.save();
-
-        console.log(`[Unknown/Handoff] Logged: "${text}" x${unknownSession.count}`);
-        
-        // Auto-reply to let them know it's being reviewed by a human
-        const handoffMessage = "I'm not quite sure about that yet, but I've escalated your question to my human team. They will get back to you shortly!";
-        const adapter = this.getAdapter(eventId, sourcePlatform);
-        if (adapter) {
-            await adapter.sendMessage(channelId, handoffMessage);
-        }
-        return { matched: false, answer: handoffMessage };
     }
 
 }

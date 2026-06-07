@@ -13,6 +13,9 @@ const webhooksRouter = require('./webhooks');
 const oauthRouter = require('./oauth');
 const widgetRouter = require('./widget');
 
+const conversationsRouter = require('./conversations');
+const moderationRouter = require('./moderation');
+
 router.use('/faqs', faqsRouter);
 router.use('/settings', settingsRouter);
 router.use('/analytics', analyticsRouter);
@@ -21,6 +24,8 @@ router.use('/unknown-questions', unknownQuestionsRouter);
 router.use('/events', eventsRouter);
 eventsRouter.use('/:eventId/integrations', integrationsRouter);
 eventsRouter.use('/:eventId/team', teamRouter);
+eventsRouter.use('/:eventId/conversations', conversationsRouter);
+eventsRouter.use('/:eventId/moderation', moderationRouter);
 
 router.use('/webhooks', webhooksRouter);
 router.use('/oauth', oauthRouter);

@@ -5,9 +5,15 @@ const UserSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  role: { type: String, enum: ['user', 'admin', 'moderator'], default: 'user' },
-  phoneNumber: { type: String, default: '' },
-  linkedinProfile: { type: String, default: '' },
+  role: { type: String, enum: ['user', 'admin', 'moderator', 'owner'], default: 'user' },
+  status: { type: String, enum: ['active', 'flagged', 'banned'], default: 'active' },
+  platforms: {
+    discordId: { type: String, default: null },
+    slackId: { type: String, default: null },
+    telegramId: { type: String, default: null },
+    webId: { type: String, default: null } // anonymous session ID
+  },
+  spamScore: { type: Number, default: 0 },
   createdAt: { type: Date, default: Date.now },
 });
 

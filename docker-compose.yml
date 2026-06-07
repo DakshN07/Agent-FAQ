@@ -50,16 +50,13 @@ services:
       retries: 5
     restart: unless-stopped
 
-  db:
-    image: ankane/pgvector:v0.5.1
-    environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: agentfaq
+  qdrant:
+    image: qdrant/qdrant
     ports:
-      - "5432:5432"
+      - "6333:6333"
+      - "6334:6334"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - qdrant_data:/qdrant/storage
     restart: unless-stopped
 
   redis:
