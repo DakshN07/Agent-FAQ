@@ -1,25 +1,26 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { MistralAIEmbeddings } = require('@langchain/mistralai');
 
-let genAI = null;
-const apiKey = process.env.GEMINI_API_KEY;
+let embeddingsModel = null;
+const apiKey = process.env.MISTRAL_API_KEY;
 
 if (apiKey) {
-  genAI = new GoogleGenerativeAI(apiKey);
+  embeddingsModel = new MistralAIEmbeddings({
+    apiKey: apiKey,
+    modelName: "mistral-embed"
+  });
 } else {
-  console.warn("⚠️ GEMINI_API_KEY is not set. AI embedding features will be disabled.");
+  console.warn("⚠️ MISTRAL_API_KEY is not set. AI embedding features will be disabled.");
 }
 
 async function getEmbedding(text) {
-  if (!genAI) {
-    console.warn("⚠️ Attempted to generate embedding without GEMINI_API_KEY.");
+  if (!embeddingsModel) {
+    console.warn("⚠️ Attempted to generate embedding without MISTRAL_API_KEY.");
     return null;
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
-
-    const result = await model.embedContent(text);
-    return result.embedding.values;
+    const embedding = await embeddingsModel.embedQuery(text);
+    return embedding;
   } catch (error) {
     console.error('❌ Error generating embedding:', error);
     return null;

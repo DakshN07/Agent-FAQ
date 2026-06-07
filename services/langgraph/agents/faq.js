@@ -1,4 +1,4 @@
-const { ChatOpenAI } = require('@langchain/openai');
+const { ChatMistralAI } = require('@langchain/mistralai');
 const { SystemMessage, HumanMessage } = require('@langchain/core/messages');
 const { QdrantClient } = require('@qdrant/js-client-rest');
 
@@ -55,7 +55,7 @@ async function faqNode(state) {
             .map(r => `Q: ${r.payload.question}\nA: ${r.payload.answer}`)
             .join('\n\n');
 
-        const model = new ChatOpenAI({ temperature: 0, modelName: "gpt-4o-mini" });
+        const model = new ChatMistralAI({ temperature: 0, modelName: "mistral-large-latest" });
         const response = await model.invoke([
             new SystemMessage(faqPrompt(contextText)),
             new HumanMessage(query)

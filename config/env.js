@@ -7,7 +7,9 @@ const envVarsSchema = joi.object({
   MONGO_URI: joi.string().required().description('Mongo DB URL'),
   JWT_SECRET: joi.string().required().description('JWT Secret Key'),
   REDIS_URL: joi.string().optional().description('Redis URL for cache/sessions'),
-  SENTRY_DSN: joi.string().optional().description('Sentry DSN for error tracking')
+  SENTRY_DSN: joi.string().optional().description('Sentry DSN for error tracking'),
+  MISTRAL_API_KEY: joi.string().required().description('Mistral Key for LangGraph Agents'),
+  QDRANT_URL: joi.string().optional().description('Qdrant Vector DB URL')
 }).unknown();
 
 const { value: envVars, error } = envVarsSchema.validate(process.env);

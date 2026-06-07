@@ -1,4 +1,4 @@
-const { ChatOpenAI } = require('@langchain/openai');
+const { ChatMistralAI } = require('@langchain/mistralai');
 const { SystemMessage, HumanMessage } = require('@langchain/core/messages');
 const { QdrantClient } = require('@qdrant/js-client-rest');
 const Faq = require('../../../models/Faq');
@@ -17,7 +17,7 @@ Given the Question and Answer, provide a JSON response with exactly two fields:
 
 async function runLearningAgent(eventId, question, answer, sourcePlatform, adminId) {
   try {
-    const model = new ChatOpenAI({ temperature: 0, modelName: "gpt-4o-mini", responseFormat: { type: "json_object" } });
+    const model = new ChatMistralAI({ temperature: 0, modelName: "mistral-large-latest", responseFormat: { type: "json_object" } });
     
     // 1. Generate Metadata using LLM
     const response = await model.invoke([

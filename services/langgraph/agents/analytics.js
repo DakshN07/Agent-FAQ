@@ -1,4 +1,4 @@
-const { ChatOpenAI } = require('@langchain/openai');
+const { ChatMistralAI } = require('@langchain/mistralai');
 const { SystemMessage, HumanMessage } = require('@langchain/core/messages');
 const Analytics = require('../../../models/Analytics');
 
@@ -10,7 +10,7 @@ Raw Data:
 ${data}`;
 
 async function analyticsNode(state) {
-  const model = new ChatOpenAI({ temperature: 0, modelName: "gpt-4o" });
+  const model = new ChatMistralAI({ temperature: 0, modelName: "mistral-large-latest" });
   const messages = state.messages;
   const lastMessage = messages[messages.length - 1];
 
