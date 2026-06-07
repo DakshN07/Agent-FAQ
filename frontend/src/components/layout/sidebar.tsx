@@ -13,8 +13,12 @@ import {
   Sparkles
 } from "lucide-react";
 
+import { ShieldAlert, Bot } from "lucide-react";
+
 const navItems = [
   { name: "Unified Inbox", href: "/dashboard/inbox", icon: Inbox },
+  { name: "Moderation", href: "/dashboard/moderation", icon: ShieldAlert },
+  { name: "AI Assistant", href: "/dashboard/ai-assistant", icon: Bot },
   { name: "Events", href: "/dashboard/events", icon: CalendarDays },
   { name: "Integrations", href: "/dashboard/integrations", icon: Plug },
   { name: "Team", href: "/dashboard/team", icon: Users },

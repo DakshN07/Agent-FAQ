@@ -1,207 +1,179 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { 
-  CheckCircle2, 
-  MessageSquare, 
-  Clock, 
-  Send,
-  MoreVertical,
-  ThumbsUp,
-  AlertCircle
+  MessageSquare, Clock, Send, MoreVertical, ShieldAlert,
+  Bot, User as UserIcon, CheckCircle2, Search, Filter
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
-export default function InboxPage() {
-  const [queries, setQueries] = useState<any[]>([]);
-  const [selectedQuery, setSelectedQuery] = useState<any>(null);
-  const [draftText, setDraftText] = useState("");
-  const eventId = "PLACEHOLDER_EVENT_ID"; // In real app, get from Context
+export default function UnifiedInbox() {
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [selectedConv, setSelectedConv] = useState<any>(null);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [replyText, setReplyText] = useState("");
+  const [filter, setFilter] = useState("All");
+
+  const eventId = "PLACEHOLDER_EVENT_ID"; // Get from context
 
   useEffect(() => {
-    fetch(`http://localhost:3000/api/unknown-questions?eventId=${eventId}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data && Array.isArray(data)) {
-            const formatted = data.filter(q => q != null).map(q => ({
-                id: q._id,
-                user: "User",
-                platform: q.sourcePlatform || "unknown",
-                query: q.text || "",
-                status: q.handoffStatus || "pending",
-                time: new Date(q.lastAskedAt || q.firstAskedAt || Date.now()).toLocaleTimeString(),
-                aiDraft: "I'm sorry, I don't have an answer for that yet. Can I help you with anything else?",
-                confidence: 0
-            }));
-            setQueries(formatted);
-            if (formatted.length > 0) {
-                setSelectedQuery(formatted[0]);
-                setDraftText(formatted[0].aiDraft);
-            }
-        }
-      })
-      .catch(console.error);
-  }, [eventId]);
+    // Mock data for UI demonstration since backend DB might be empty initially
+    const mockConvs = [
+      { _id: '1', platform: 'discord', status: 'Escalated', lastMessageAt: new Date().toISOString(), userId: { username: 'AlexD' }, text: 'I am getting a billing error.' },
+      { _id: '2', platform: 'telegram', status: 'Answered', lastMessageAt: new Date(Date.now() - 3600000).toISOString(), userId: { username: 'CryptoFan' }, text: 'When is the next drop?' },
+      { _id: '3', platform: 'slack', status: 'Pending', lastMessageAt: new Date(Date.now() - 7200000).toISOString(), userId: { username: 'Sarah Team' }, text: 'How do I invite members?' },
+    ];
+    setConversations(mockConvs);
+  }, []);
 
-  const handleApprove = async () => {
-    if (!selectedQuery) return;
-    try {
-        await fetch(`http://localhost:3000/api/unknown-questions/${selectedQuery.id}/answer`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ answer: draftText })
-        });
-        setQueries(q => q.filter(item => item.id !== selectedQuery.id));
-        setSelectedQuery(null);
-        setDraftText("");
-        alert("Answer sent and saved to FAQ!");
-    } catch (e) {
-        alert("Failed to send answer");
-    }
+  const handleSelectConv = (conv: any) => {
+    setSelectedConv(conv);
+    // Mock messages
+    setMessages([
+      { id: 'm1', senderType: 'User', text: conv.text, createdAt: conv.lastMessageAt },
+      ...(conv.status === 'Answered' ? [{ id: 'm2', senderType: 'Agent', text: 'The next drop is on Friday at 5 PM UTC!', createdAt: new Date().toISOString(), confidence: 0.95 }] : [])
+    ]);
   };
 
-  return (
-    <div className="h-[calc(100vh-8rem)] flex gap-6">
-      
-      {/* Column 1: Queue */}
-      <div className="w-1/3 flex flex-col gap-4 rounded-xl border border-border bg-card/50 backdrop-blur-sm overflow-hidden">
-        <div className="p-4 border-b border-border bg-card/80">
-          <h2 className="font-semibold flex items-center justify-between">
-            Pending Approvals
-            <span className="bg-accent text-accent-foreground text-xs px-2 py-1 rounded-full">
-              {queries.length}
-            </span>
-          </h2>
-        </div>
-        <div className="flex-1 overflow-y-auto p-2 space-y-2">
-          {queries.map((q) => (
-            <button
-              key={q.id}
-              onClick={() => {
-                setSelectedQuery(q);
-                setDraftText(q.aiDraft);
-              }}
-              className={cn(
-                "w-full text-left p-4 rounded-lg transition-all duration-200 border",
-                selectedQuery?.id === q.id 
-                  ? "bg-accent/20 border-accent text-accent-foreground" 
-                  : "bg-background border-transparent hover:border-border"
-              )}
-            >
-              <div className="flex justify-between items-start mb-2">
-                <span className="font-medium text-sm">{q.user}</span>
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Clock className="w-3 h-3" /> {q.time}
-                </span>
-              </div>
-              <p className="text-sm line-clamp-2 text-muted-foreground mb-3">{q.query}</p>
-              <div className="flex items-center justify-between text-xs">
-                <span className="px-2 py-1 rounded-md bg-muted text-muted-foreground">
-                  via {q.platform}
-                </span>
-                <span className={cn(
-                  "flex items-center gap-1",
-                  q.confidence > 90 ? "text-emerald-500" : "text-amber-500"
-                )}>
-                  {q.confidence > 90 ? <ThumbsUp className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
-                  {q.confidence}% Match
-                </span>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
+  const filteredConvs = filter === "All" ? conversations : conversations.filter(c => c.status === filter);
 
-      {/* Column 2: Context */}
-      <div className="w-1/3 flex flex-col gap-4 rounded-xl border border-border bg-card/50 backdrop-blur-sm overflow-hidden">
-        <div className="p-4 border-b border-border bg-card/80 flex justify-between items-center">
-          <h2 className="font-semibold">User Context</h2>
-          <button className="text-muted-foreground hover:text-foreground">
-            <MoreVertical className="w-4 h-4" />
-          </button>
+  return (
+    <div className="h-[calc(100vh-6rem)] flex flex-col md:flex-row gap-6 bg-background text-foreground font-sans">
+      
+      {/* Sidebar: Conversation List */}
+      <motion.div 
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        className="w-full md:w-1/3 lg:w-1/4 flex flex-col rounded-2xl border border-border/50 bg-card/30 backdrop-blur-xl overflow-hidden shadow-sm"
+      >
+        <div className="p-4 border-b border-border/50">
+          <h2 className="text-lg font-medium tracking-tight mb-4">Inbox</h2>
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide snap-x">
+            {["All", "Pending", "Escalated", "Answered"].map(f => (
+              <button 
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`snap-start px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition-all ${filter === f ? 'bg-primary text-primary-foreground shadow-md' : 'bg-muted/50 text-muted-foreground hover:bg-muted'}`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="flex-1 p-6 flex flex-col">
-          {selectedQuery ? (
-            <>
-              <div className="flex items-start gap-4 mb-8">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
-                  {selectedQuery.user.charAt(0)}
+
+        <div className="flex-1 overflow-y-auto p-3 space-y-2 smooth-scroll">
+          <AnimatePresence>
+            {filteredConvs.map((conv, i) => (
+              <motion.button
+                key={conv._id}
+                layout
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ delay: i * 0.05 }}
+                onClick={() => handleSelectConv(conv)}
+                className={`w-full text-left p-4 rounded-xl transition-all duration-300 ${selectedConv?._id === conv._id ? 'bg-accent text-accent-foreground ring-1 ring-border/50 shadow-sm' : 'hover:bg-muted/30'}`}
+              >
+                <div className="flex justify-between items-center mb-2">
+                  <span className="font-semibold text-sm truncate pr-2">{conv.userId?.username || 'Anonymous'}</span>
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{conv.platform}</span>
+                </div>
+                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed mb-3">{conv.text}</p>
+                <div className="flex justify-between items-center">
+                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${conv.status === 'Answered' ? 'bg-emerald-500/10 text-emerald-500' : conv.status === 'Escalated' ? 'bg-amber-500/10 text-amber-500' : 'bg-blue-500/10 text-blue-500'}`}>
+                    {conv.status}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {new Date(conv.lastMessageAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                  </span>
+                </div>
+              </motion.button>
+            ))}
+          </AnimatePresence>
+        </div>
+      </motion.div>
+
+      {/* Main Content: Chat View */}
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="flex-1 flex flex-col rounded-2xl border border-border/50 bg-card/30 backdrop-blur-xl overflow-hidden shadow-sm relative"
+      >
+        {selectedConv ? (
+          <>
+            <div className="p-4 border-b border-border/50 flex justify-between items-center bg-card/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-medium shadow-inner">
+                  {(selectedConv.userId?.username || 'A').charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <h3 className="font-medium">{selectedQuery.user}</h3>
-                  <p className="text-sm text-muted-foreground">User on {selectedQuery.platform}</p>
+                  <h3 className="font-medium tracking-tight text-sm">{selectedConv.userId?.username || 'Anonymous'}</h3>
+                  <p className="text-xs text-muted-foreground">via {selectedConv.platform}</p>
                 </div>
               </div>
-              
-              <div className="bg-muted/50 rounded-lg p-4 border border-border">
-                <div className="text-xs text-muted-foreground mb-2 flex items-center gap-2">
-                  <MessageSquare className="w-3 h-3" /> Incoming Message
-                </div>
-                <p className="text-sm font-medium leading-relaxed">
-                  "{selectedQuery.query}"
-                </p>
-              </div>
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-              No query selected
+              <button className="p-2 text-muted-foreground hover:bg-muted rounded-full transition-colors">
+                <MoreVertical className="w-4 h-4" />
+              </button>
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* Column 3: AI Draft & Approval */}
-      <div className="w-1/3 flex flex-col rounded-xl border border-border bg-card/50 backdrop-blur-sm overflow-hidden shadow-2xl relative">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500" />
-        <div className="p-4 border-b border-border bg-card/80">
-          <h2 className="font-semibold flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-purple-400" />
-            AI Response Draft
-          </h2>
-        </div>
-        <div className="flex-1 p-4 flex flex-col gap-4">
-          <div className="flex-1">
-            <label className="text-xs font-medium text-muted-foreground mb-2 block">Edit Draft</label>
-            <textarea 
-              value={draftText}
-              onChange={(e) => setDraftText(e.target.value)}
-              disabled={!selectedQuery}
-              className="w-full h-full min-h-[200px] bg-background border border-border rounded-lg p-4 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all disabled:opacity-50"
-            />
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 smooth-scroll">
+              <AnimatePresence>
+                {messages.map((msg, i) => (
+                  <motion.div 
+                    key={msg.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`flex ${msg.senderType === 'User' ? 'justify-start' : 'justify-end'}`}
+                  >
+                    <div className={`max-w-[80%] flex flex-col ${msg.senderType === 'User' ? 'items-start' : 'items-end'}`}>
+                      <div className={`flex items-center gap-2 mb-1 px-1 ${msg.senderType === 'User' ? 'flex-row' : 'flex-row-reverse'}`}>
+                        {msg.senderType === 'Agent' ? <Bot className="w-3 h-3 text-purple-500" /> : <UserIcon className="w-3 h-3 text-muted-foreground" />}
+                        <span className="text-[10px] text-muted-foreground uppercase font-medium tracking-wider">
+                          {msg.senderType}
+                        </span>
+                      </div>
+                      <div className={`p-4 rounded-2xl text-sm leading-relaxed ${msg.senderType === 'User' ? 'bg-muted/50 rounded-tl-sm' : 'bg-primary text-primary-foreground shadow-md rounded-tr-sm'}`}>
+                        {msg.text}
+                      </div>
+                      {msg.confidence && (
+                        <div className="mt-1 px-1 text-[10px] text-emerald-500 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" />
+                          {(msg.confidence * 100).toFixed(0)}% AI Confidence
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+
+            <div className="p-4 bg-card/50 border-t border-border/50">
+              <div className="relative flex items-center">
+                <input 
+                  type="text" 
+                  value={replyText}
+                  onChange={e => setReplyText(e.target.value)}
+                  placeholder="Type a reply to send..." 
+                  className="w-full bg-background border border-border/50 rounded-full pl-6 pr-12 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-sm"
+                />
+                <button className="absolute right-2 p-2 bg-primary text-primary-foreground rounded-full hover:scale-105 transition-transform shadow-md">
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-[10px] text-center text-muted-foreground mt-3 uppercase tracking-widest">
+                Replying will train the AI automatically
+              </p>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground opacity-50">
+            <MessageSquare className="w-16 h-16 mb-4 stroke-[1.5]" />
+            <p className="text-sm font-medium tracking-wide">Select a conversation to begin</p>
           </div>
-          
-          <div className="flex gap-3 pt-4 border-t border-border mt-auto">
-            <button disabled={!selectedQuery} className="flex-1 bg-background border border-border hover:bg-muted text-foreground py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-              Reject
-            </button>
-            <button onClick={handleApprove} disabled={!selectedQuery} className="flex-1 bg-foreground text-background hover:bg-foreground/90 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
-              <CheckCircle2 className="w-4 h-4" />
-              Approve & Send
-            </button>
-          </div>
-        </div>
-      </div>
+        )}
+      </motion.div>
 
     </div>
-  );
-}
-
-// Sparkles Icon component wrapper if not imported from lucide-react above
-function Sparkles(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
-    </svg>
   );
 }
