@@ -4,17 +4,32 @@ import Link from "next/link";
 import { Sparkles, ArrowRight, Lock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { apiFetch, saveAuthSession } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate real authentication by storing user details
-    const name = email.split('@')[0] || "User";
-    localStorage.setItem('user', JSON.stringify({ name, email, plan: 'Free Tier' }));
-    router.push("/dashboard");
+    setError("");
+    setIsSubmitting(true);
+
+    try {
+      const { token, user } = await apiFetch<{ token: string; user: { username: string; email: string } }>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
+      saveAuthSession(token, { ...user, name: user.username, plan: "Free Tier" });
+      router.push("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to sign in.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   return (
     <div className="min-h-screen flex items-center justify-center bg-black text-white relative overflow-hidden">
@@ -64,20 +79,24 @@ export default function LoginPage() {
                   placeholder="••••••••" 
                   type="password" 
                   required 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                 />
                 <Lock className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
               </div>
             </div>
 
-            <button className="flex items-center justify-center w-full rounded-md bg-gradient-to-r from-purple-600 to-blue-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all mt-6 group">
-              Sign In
+            {error && <p className="text-sm text-red-400">{error}</p>}
+
+            <button disabled={isSubmitting} className="flex items-center justify-center w-full rounded-md bg-gradient-to-r from-purple-600 to-blue-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all mt-6 group disabled:opacity-60">
+              {isSubmitting ? "Signing In..." : "Sign In"}
               <ArrowRight className="ml-2 h-4 w-4 transform group-hover:translate-x-1 transition-transform" />
             </button>
           </form>
         </div>
 
         <p className="text-center text-sm text-gray-400 mt-8">
-          Don't have an account?{" "}
+          Don&apos;t have an account?{" "}
           <Link href="/register/org" className="text-white font-medium hover:underline">
             Register your organization
           </Link>

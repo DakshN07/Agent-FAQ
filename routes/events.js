@@ -4,7 +4,7 @@ const Event = require('../models/Event');
 const Faq = require('../models/Faq');
 const EventMember = require('../models/EventMember');
 const { authenticate } = require('../middleware/auth');
-const { generateOnboardingFAQs, generateEventDescription } = require('../services/ai');
+const { generateOnboardingFAQs, generateEventDescription, generateEventDraft } = require('../services/ai');
 const { getEmbedding } = require('../services/embedding');
 
 // Generate unique invite code helper
@@ -18,6 +18,19 @@ const generateInviteCode = async () => {
     }
     return code;
 };
+
+
+// Generate an event draft from a natural-language prompt
+router.post('/generate', authenticate, async (req, res) => {
+    try {
+        const { prompt } = req.body;
+        if (!prompt || !prompt.trim()) return res.status(400).json({ error: 'Prompt is required' });
+        const draft = await generateEventDraft(prompt.trim());
+        res.json(draft);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 
 // Create event
 router.post('/', authenticate, async (req, res) => {

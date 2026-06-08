@@ -2,32 +2,48 @@
 
 import { useState, useEffect } from "react";
 import { Users, UserPlus, Mail, Shield, MoreVertical, Trash2, Edit, X, Loader2 } from "lucide-react";
+import { apiFetch, ensureCurrentEventId } from "@/lib/api";
 
-// For demo purposes, we will mock API calls if they fail
-const mockMembers = [
-  { _id: '1', email: "alice@acme.com", userId: { username: "Alice Admin" }, role: "Owner", status: "Active" },
-  { _id: '2', email: "bob@acme.com", userId: { username: "Bob Builder" }, role: "Editor", status: "Active" },
-  { _id: '3', email: "charlie@acme.com", userId: null, role: "Viewer", status: "Pending" },
-  { _id: '4', email: "dave@acme.com", userId: { username: "Dave" }, role: "Viewer", status: "Removed" },
-];
+type TeamMember = {
+  _id: string;
+  email: string;
+  userId?: { username?: string; email?: string } | null;
+  role: string;
+  status: "Pending" | "Active" | "Removed" | string;
+};
 
 export default function TeamPage() {
-  const [teamMembers, setTeamMembers] = useState<any[]>(mockMembers);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [eventId, setEventId] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState("Viewer");
+  const [inviteRole, setInviteRole] = useState("agent");
   const [isInviting, setIsInviting] = useState(false);
 
-  // In a real app, fetch members here:
-  // useEffect(() => { fetchMembers() }, [])
+  useEffect(() => {
+    const fetchMembers = async () => {
+      const currentEventId = await ensureCurrentEventId();
+      setEventId(currentEventId);
+      if (!currentEventId) return;
+
+      const members = await apiFetch<TeamMember[]>(`/events/${currentEventId}/team`);
+      setTeamMembers(members);
+    };
+
+    fetchMembers().catch((error) => console.error("Failed to load team members", error));
+  }, []);
 
   const removeMember = async (id: string) => {
-    // Optimistic UI update
     setTeamMembers(teamMembers.map(m => m._id === id ? { ...m, status: "Removed" } : m));
     setOpenMenuId(null);
-    // Real app: await fetch(`/api/team/${id}`, { method: 'DELETE' })
+    if (!eventId) return;
+    try {
+      await apiFetch(`/events/${eventId}/team/${id}`, { method: "DELETE" });
+    } catch (error) {
+      console.error("Failed to remove team member", error);
+    }
   };
 
   const handleInvite = async (e: React.FormEvent) => {
@@ -36,19 +52,20 @@ export default function TeamPage() {
     
     setIsInviting(true);
     
-    // Simulate API call to /api/team/invite
-    setTimeout(() => {
-      setTeamMembers([...teamMembers, { 
-        _id: Date.now().toString(), 
-        email: inviteEmail, 
-        userId: null,
-        role: inviteRole, 
-        status: "Pending" 
-      }]);
-      setIsInviting(false);
+    try {
+      if (!eventId) throw new Error("Create or select an event before inviting members.");
+      const response = await apiFetch<{ member: TeamMember }>(`/events/${eventId}/team/invite`, {
+        method: "POST",
+        body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
+      });
+      setTeamMembers([...teamMembers, response.member]);
       setIsInviteModalOpen(false);
       setInviteEmail("");
-    }, 1000);
+    } catch (error) {
+      console.error("Failed to invite team member", error);
+    } finally {
+      setIsInviting(false);
+    }
   };
 
   return (
@@ -205,9 +222,9 @@ export default function TeamPage() {
                   onChange={(e) => setInviteRole(e.target.value)}
                   className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none"
                 >
-                  <option value="Viewer">Viewer - Can only view data</option>
-                  <option value="Editor">Editor - Can modify FAQs and settings</option>
-                  <option value="Admin">Admin - Full access including team</option>
+                  <option value="agent">Viewer - Can only view data</option>
+                  <option value="agent">Editor - Can modify FAQs and settings</option>
+                  <option value="admin">Admin - Full access including team</option>
                 </select>
               </div>
 

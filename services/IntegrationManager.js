@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Integration = require('../models/Integration');
 const DiscordAdapter = require('../adapters/DiscordAdapter');
 const SlackAdapter = require('../adapters/SlackAdapter');
@@ -91,7 +92,8 @@ class IntegrationManager {
             if (!conversation) {
                 conversation = await Conversation.create({
                     eventId,
-                    userId,
+                    userId: mongoose.Types.ObjectId.isValid(userId) ? userId : null,
+                    externalUserId: String(userId || ''),
                     platform: sourcePlatform,
                     channelId,
                     status: 'Pending'

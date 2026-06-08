@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { MessageSquare, MessageCircle, Code2, Check, ArrowRight } from "lucide-react";
+import { API_BASE_URL, apiFetch, ensureCurrentEventId } from "@/lib/api";
 
 const INTEGRATIONS = [
   {
@@ -44,6 +46,22 @@ const INTEGRATIONS = [
 ];
 
 export default function IntegrationsPage() {
+  const [eventId, setEventId] = useState<string | null>(null);
+  const [connectedPlatforms, setConnectedPlatforms] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const loadIntegrations = async () => {
+      const currentEventId = await ensureCurrentEventId();
+      setEventId(currentEventId);
+      if (!currentEventId) return;
+
+      const integrations = await apiFetch<Array<{ platform: string; isActive: boolean }>>(`/events/${currentEventId}/integrations`);
+      setConnectedPlatforms(new Set(integrations.filter((integration) => integration.isActive).map((integration) => integration.platform)));
+    };
+
+    loadIntegrations().catch((error) => console.error("Failed to load integrations", error));
+  }, []);
+
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div>
@@ -64,7 +82,7 @@ export default function IntegrationsPage() {
               </div>
             </div>
             
-            {app.status === "connected" ? (
+            {connectedPlatforms.has(app.name.toLowerCase()) ? (
               <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500/10 text-emerald-500 text-sm font-medium border border-emerald-500/20">
                 <Check className="w-4 h-4" />
                 Connected
@@ -72,11 +90,15 @@ export default function IntegrationsPage() {
             ) : (
               <button 
                 onClick={() => {
-                    const eventId = "PLACEHOLDER_EVENT_ID"; // In real app, get from Context
+                    if (!eventId) {
+                        alert("Create or select an event before connecting integrations.");
+                        return;
+                    }
                     if (app.action === 'widget') {
-                        alert(`<!-- Add this to your website's <head> -->\n<script src="http://localhost:5173/widget.js" data-event-id="${eventId}"></script>`);
+                        alert(`<!-- Add this to your website's <head> -->
+<script src="${API_BASE_URL.replace(/\/api$/, "")}/widget.js" data-event-id="${eventId}"></script>`);
                     } else {
-                        window.location.href = `http://localhost:3000/api/oauth/${app.name.toLowerCase()}?state=${eventId}`;
+                        window.location.href = `${API_BASE_URL}/oauth/${app.name.toLowerCase()}?state=${eventId}`;
                     }
                 }}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-foreground text-background hover:bg-foreground/90 text-sm font-medium transition-colors"

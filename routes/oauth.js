@@ -106,6 +106,18 @@ router.get('/discord/callback', async (req, res) => {
     }
 });
 
+
+// Forwarder to Telegram bot start link when a bot username is configured
+router.get('/telegram', async (req, res) => {
+    const { state } = req.query; // eventId
+    if (!state || !process.env.TELEGRAM_BOT_TOKEN || !process.env.TELEGRAM_BOT_USERNAME) {
+        return res.redirect(`${FRONTEND_URL}/dashboard?connect=error&platform=telegram`);
+    }
+
+    await saveIntegration(state, 'telegram', { token: process.env.TELEGRAM_BOT_TOKEN });
+    res.redirect(`https://t.me/${process.env.TELEGRAM_BOT_USERNAME}?start=${encodeURIComponent(state)}`);
+});
+
 // 3. Telegram Login Widget Callback
 // Telegram redirects here with data verifyable by HMAC-SHA256
 router.get('/telegram/callback', async (req, res) => {
@@ -137,6 +149,44 @@ router.get('/telegram/callback', async (req, res) => {
     } catch (error) {
         console.error("Telegram callback error:", error);
         res.redirect(`${FRONTEND_URL}/dashboard?connect=error&platform=telegram`);
+    }
+});
+
+
+// Forwarder to Meta's WhatsApp Business OAuth page
+router.get('/whatsapp', (req, res) => {
+    const { state } = req.query; // eventId
+    const redirectUri = `${process.env.VITE_API_URL || 'http://localhost:3000'}/api/oauth/whatsapp/callback`;
+    const url = `https://www.facebook.com/v17.0/dialog/oauth?client_id=${process.env.WHATSAPP_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=whatsapp_business_management,whatsapp_business_messaging&state=${state}`;
+    res.redirect(url);
+});
+
+router.get('/whatsapp/callback', async (req, res) => {
+    const { code, state, error } = req.query;
+
+    if (error) return res.redirect(`${FRONTEND_URL}/dashboard?connect=error&platform=whatsapp`);
+    if (!code || !state) return res.status(400).send('Missing code or state');
+
+    try {
+        const redirectUri = `${process.env.VITE_API_URL || 'http://localhost:3000'}/api/oauth/whatsapp/callback`;
+        const response = await axios.get('https://graph.facebook.com/v17.0/oauth/access_token', {
+            params: {
+                client_id: process.env.WHATSAPP_APP_ID,
+                client_secret: process.env.WHATSAPP_APP_SECRET,
+                redirect_uri: redirectUri,
+                code
+            }
+        });
+
+        await saveIntegration(state, 'whatsapp', {
+            token: response.data.access_token,
+            phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID
+        });
+
+        res.redirect(`${FRONTEND_URL}/dashboard?connect=success&platform=whatsapp`);
+    } catch (err) {
+        console.error("WhatsApp OAuth Error:", err.response?.data || err.message);
+        res.redirect(`${FRONTEND_URL}/dashboard?connect=error&platform=whatsapp`);
     }
 });
 
