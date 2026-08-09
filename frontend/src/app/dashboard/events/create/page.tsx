@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { Sparkles, Calendar, Clock, MapPin, Tag, Gift, Type, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { apiFetch, setCurrentEventId } from "@/lib/api";
 
 export default function CreateEventPage() {
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState("");
   const [eventData, setEventData] = useState({
     name: "",
     date: "",
@@ -23,20 +25,14 @@ export default function CreateEventPage() {
     setIsGenerating(true);
     
     try {
-      // Typically we would fetch this from /api/events/generate
-      // For now, simulating the AI generation delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      setEventData({
-        name: "ETH Global India",
-        date: "2026-10-24",
-        time: "09:00 AM",
-        venue: "KTPO Convention Centre, Bengaluru",
-        event_type: "Hackathon",
-        description: "The largest Ethereum hackathon in India. Build the future of Web3 with top developers worldwide.",
-        goodies: "T-shirts, hoodies, exclusive NFT badges"
+      setError("");
+      const draft = await apiFetch<typeof eventData>("/events/generate", {
+        method: "POST",
+        body: JSON.stringify({ prompt }),
       });
+      setEventData(draft);
     } catch (error) {
+      setError(error instanceof Error ? error.message : "Failed to generate event.");
       console.error("Failed to generate event", error);
     } finally {
       setIsGenerating(false);
@@ -45,9 +41,37 @@ export default function CreateEventPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate API save
-    alert("Event saved successfully!");
-    router.push("/dashboard/inbox"); // Or /dashboard/events
+    setError("");
+
+    try {
+      const descriptionParts = [
+        eventData.description,
+        eventData.event_type && `Type: ${eventData.event_type}`,
+        eventData.date && `Date: ${eventData.date}`,
+        eventData.time && `Time: ${eventData.time}`,
+        eventData.venue && `Venue: ${eventData.venue}`,
+        eventData.goodies && `Goodies: ${eventData.goodies}`,
+      ].filter(Boolean);
+
+      const response = await apiFetch<{ event: { _id: string } }>("/events", {
+        method: "POST",
+        body: JSON.stringify({
+          name: eventData.name,
+          description: descriptionParts.join("\n"),
+          details: {
+            date: eventData.date,
+            startTime: eventData.time,
+            location: eventData.venue,
+            prizes: eventData.goodies,
+            theme: eventData.event_type,
+          },
+        }),
+      });
+      setCurrentEventId(response.event._id);
+      router.push("/dashboard/inbox");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Failed to save event.");
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -68,7 +92,7 @@ export default function CreateEventPage() {
       {/* AI Prompt Section */}
       <div className="bg-white/5 border border-white/10 rounded-2xl p-6 mb-8 backdrop-blur-md">
         <label className="block text-sm font-medium text-gray-300 mb-2">
-          Describe your event (The "Bestest" Way)
+          Describe your event (The &quot;Bestest&quot; Way)
         </label>
         <div className="relative">
           <textarea
@@ -92,6 +116,8 @@ export default function CreateEventPage() {
       <form onSubmit={handleSave} className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-md space-y-6">
         <h2 className="text-xl font-semibold mb-4 border-b border-white/10 pb-4">Event Details</h2>
         
+        {error && <p className="text-sm text-red-400">{error}</p>}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-300 flex items-center gap-2">

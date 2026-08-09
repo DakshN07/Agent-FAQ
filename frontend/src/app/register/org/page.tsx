@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Sparkles, Building, ArrowRight, Lock, User, Mail } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiFetch, saveAuthSession } from "@/lib/api";
 
 export default function RegisterOrgPage() {
   const [orgName, setOrgName] = useState("");
@@ -11,17 +12,27 @@ export default function RegisterOrgPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const router = useRouter();
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate API call and save user details
-    localStorage.setItem('user', JSON.stringify({ 
-      name: adminName, 
-      org: orgName, 
-      email: email, 
-      plan: 'Pro Plan' // Giving them pro plan upon org registration!
-    }));
-    router.push("/dashboard/events/create");
+    setError("");
+    setIsSubmitting(true);
+
+    try {
+      const { token, user } = await apiFetch<{ token: string; user: { username: string; email: string } }>("/auth/register", {
+        method: "POST",
+        body: JSON.stringify({ username: adminName, email, password }),
+      });
+      saveAuthSession(token, { ...user, name: user.username, org: orgName, plan: "Pro Plan" });
+      localStorage.setItem("onboarding_orgName", orgName);
+      router.push("/dashboard/events/create");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to register organization.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -101,8 +112,10 @@ export default function RegisterOrgPage() {
               </div>
             </div>
 
-            <button type="submit" className="flex items-center justify-center w-full rounded-md bg-gradient-to-r from-purple-600 to-blue-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all mt-6 group">
-              Register Organization
+            {error && <p className="text-sm text-red-400">{error}</p>}
+
+            <button type="submit" disabled={isSubmitting} className="flex items-center justify-center w-full rounded-md bg-gradient-to-r from-purple-600 to-blue-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all mt-6 group disabled:opacity-60">
+              {isSubmitting ? "Registering..." : "Register Organization"}
               <ArrowRight className="ml-2 h-4 w-4 transform group-hover:translate-x-1 transition-transform" />
             </button>
           </form>

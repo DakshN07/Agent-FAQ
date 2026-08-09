@@ -3,36 +3,76 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  MessageSquare, Clock, Send, MoreVertical, ShieldAlert,
-  Bot, User as UserIcon, CheckCircle2, Search, Filter
+  MessageSquare, Clock, Send, MoreVertical,
+  Bot, User as UserIcon, CheckCircle2
 } from "lucide-react";
+import { apiFetch, ensureCurrentEventId } from "@/lib/api";
+
+type Conversation = {
+  _id: string;
+  platform: string;
+  status: string;
+  lastMessageAt: string;
+  text: string;
+  userId?: { username?: string; email?: string } | null;
+};
+
+type InboxMessage = {
+  _id?: string;
+  id?: string;
+  senderType: "User" | "Agent" | "Human";
+  text: string;
+  createdAt: string;
+  confidence?: number | null;
+};
 
 export default function UnifiedInbox() {
-  const [conversations, setConversations] = useState<any[]>([]);
-  const [selectedConv, setSelectedConv] = useState<any>(null);
-  const [messages, setMessages] = useState<any[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [selectedConv, setSelectedConv] = useState<Conversation | null>(null);
+  const [messages, setMessages] = useState<InboxMessage[]>([]);
   const [replyText, setReplyText] = useState("");
   const [filter, setFilter] = useState("All");
 
-  const eventId = "PLACEHOLDER_EVENT_ID"; // Get from context
+  const [eventId, setEventId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Mock data for UI demonstration since backend DB might be empty initially
-    const mockConvs = [
-      { _id: '1', platform: 'discord', status: 'Escalated', lastMessageAt: new Date().toISOString(), userId: { username: 'AlexD' }, text: 'I am getting a billing error.' },
-      { _id: '2', platform: 'telegram', status: 'Answered', lastMessageAt: new Date(Date.now() - 3600000).toISOString(), userId: { username: 'CryptoFan' }, text: 'When is the next drop?' },
-      { _id: '3', platform: 'slack', status: 'Pending', lastMessageAt: new Date(Date.now() - 7200000).toISOString(), userId: { username: 'Sarah Team' }, text: 'How do I invite members?' },
-    ];
-    setConversations(mockConvs);
+    const loadConversations = async () => {
+      const currentEventId = await ensureCurrentEventId();
+      setEventId(currentEventId);
+      if (!currentEventId) return;
+
+      const data = await apiFetch<Conversation[]>(`/events/${currentEventId}/conversations`);
+      setConversations(data);
+    };
+
+    loadConversations().catch((error) => console.error("Failed to load conversations", error));
   }, []);
 
-  const handleSelectConv = (conv: any) => {
+  const handleSelectConv = async (conv: Conversation) => {
     setSelectedConv(conv);
-    // Mock messages
-    setMessages([
-      { id: 'm1', senderType: 'User', text: conv.text, createdAt: conv.lastMessageAt },
-      ...(conv.status === 'Answered' ? [{ id: 'm2', senderType: 'Agent', text: 'The next drop is on Friday at 5 PM UTC!', createdAt: new Date().toISOString(), confidence: 0.95 }] : [])
-    ]);
+    try {
+      const data = await apiFetch<InboxMessage[]>(`/events/${eventId}/conversations/${conv._id}/messages`);
+      setMessages(data);
+    } catch (error) {
+      console.error("Failed to load messages", error);
+      setMessages([]);
+    }
+  };
+
+  const handleSendReply = async () => {
+    if (!selectedConv || !replyText.trim() || !eventId) return;
+    try {
+      const message = await apiFetch<InboxMessage>(`/events/${eventId}/conversations/${selectedConv._id}/messages`, {
+        method: "POST",
+        body: JSON.stringify({ text: replyText }),
+      });
+      setMessages((current) => [...current, message]);
+      setConversations((current) => current.map((conv) => conv._id === selectedConv._id ? { ...conv, status: "Answered", text: replyText } : conv));
+      setSelectedConv({ ...selectedConv, status: "Answered", text: replyText });
+      setReplyText("");
+    } catch (error) {
+      console.error("Failed to send reply", error);
+    }
   };
 
   const filteredConvs = filter === "All" ? conversations : conversations.filter(c => c.status === filter);
@@ -119,9 +159,9 @@ export default function UnifiedInbox() {
 
             <div className="flex-1 overflow-y-auto p-6 space-y-6 smooth-scroll">
               <AnimatePresence>
-                {messages.map((msg, i) => (
+                {messages.map((msg) => (
                   <motion.div 
-                    key={msg.id}
+                    key={msg._id || msg.id}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     className={`flex ${msg.senderType === 'User' ? 'justify-start' : 'justify-end'}`}
@@ -157,7 +197,7 @@ export default function UnifiedInbox() {
                   placeholder="Type a reply to send..." 
                   className="w-full bg-background border border-border/50 rounded-full pl-6 pr-12 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-sm"
                 />
-                <button className="absolute right-2 p-2 bg-primary text-primary-foreground rounded-full hover:scale-105 transition-transform shadow-md">
+                <button onClick={handleSendReply} className="absolute right-2 p-2 bg-primary text-primary-foreground rounded-full hover:scale-105 transition-transform shadow-md">
                   <Send className="w-4 h-4" />
                 </button>
               </div>

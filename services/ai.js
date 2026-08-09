@@ -80,7 +80,45 @@ const generateEventDescription = async (details) => {
     }
 };
 
+
+const generateEventDraft = async (prompt) => {
+    if (!process.env.GEMINI_API_KEY) {
+        throw new Error('GEMINI_API_KEY is required to generate event drafts');
+    }
+
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const generationPrompt = `
+    Convert this organizer request into event setup fields for Agent-FAQ.
+
+    Organizer request:
+    "${prompt}"
+
+    Return strict JSON only with these string keys:
+    "name", "date" (YYYY-MM-DD if present, otherwise empty string), "time" (HH:MM if present, otherwise empty string),
+    "venue", "event_type", "description", "goodies".
+    Do not include markdown or any extra text.
+    `;
+
+    const result = await model.generateContent(generationPrompt);
+    let text = result.response.text().trim();
+    if (text.startsWith('```json')) text = text.slice(7);
+    if (text.startsWith('```')) text = text.slice(3);
+    if (text.endsWith('```')) text = text.slice(0, -3);
+
+    const draft = JSON.parse(text.trim());
+    return {
+        name: draft.name || '',
+        date: draft.date || '',
+        time: draft.time || '',
+        venue: draft.venue || '',
+        event_type: draft.event_type || '',
+        description: draft.description || '',
+        goodies: draft.goodies || ''
+    };
+};
+
 module.exports = {
     generateOnboardingFAQs,
-    generateEventDescription
+    generateEventDescription,
+    generateEventDraft
 };

@@ -1,5 +1,5 @@
 const express = require('express');
-const router = express.Router();
+const router = express.Router({ mergeParams: true });
 const ModerationEvent = require('../models/ModerationEvent');
 const { authenticate } = require('../middleware/auth');
 
@@ -8,7 +8,7 @@ router.use(authenticate);
 // Get all moderation events for an event
 router.get('/', async (req, res) => {
     try {
-        const { eventId } = req.query;
+        const eventId = req.params.eventId || req.query.eventId;
         if (!eventId) return res.status(400).json({ error: 'eventId required' });
         
         const events = await ModerationEvent.find({ eventId })
