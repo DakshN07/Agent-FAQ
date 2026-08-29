@@ -5,7 +5,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "80:80"
+      - "80:3000"
     depends_on:
       backend:
         condition: service_healthy
@@ -19,8 +19,10 @@ services:
       - "3000:3000"
     environment:
       - PORT=3000
+      - NODE_ENV=production
       - MONGO_URI=mongodb://mongo:27017/agentfaq
       - REDIS_URL=redis://redis:6379
+      - QDRANT_URL=http://qdrant:6333
     env_file:
       - .env
     depends_on:

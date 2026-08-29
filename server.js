@@ -14,24 +14,34 @@ const swaggerSpecs = require('./config/swagger');
 
 const app = express();
 
-// Initialize Sentry if DSN is provided
+// Initialize Sentry if DSN is provided.
+// NOTE: @sentry/node v8+ removed Sentry.Handlers; instrumentation is set up
+// via Sentry.init() here and Sentry.setupExpressErrorHandler(app) below.
 if (config.sentry.dsn) {
   Sentry.init({
     dsn: config.sentry.dsn,
     environment: config.env,
-    tracesSampleRate: 1.0,
+    tracesSampleRate: config.env === 'production' ? 0.2 : 1.0,
   });
-  // Sentry request handler must be the first middleware
-  app.use(Sentry.Handlers.requestHandler());
 }
 
 // Security Middleware
 app.use(helmet());
-app.use(cors({
-  origin: config.env === 'production' ? ['https://your-production-domain.com'] : '*', // Update origin as needed
+
+// CORS: in production, only allow explicitly configured origins (CORS_ORIGINS).
+const corsOptions = {
+  origin:
+    config.env === 'production'
+      ? (config.corsOrigins.length ? config.corsOrigins : false)
+      : true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+};
+if (config.env === 'production' && config.corsOrigins.length === 0) {
+  logger.warn('⚠️  CORS_ORIGINS is not set in production; all cross-origin browser requests will be blocked.');
+}
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '10kb' })); // Prevent large payload attacks
 
 // Redis Client
@@ -122,9 +132,10 @@ app.get('/', (req, res) => {
   res.send('API is running...');
 });
 
-// Sentry error handler must be before any other error middleware
+// Sentry error handler must be registered before any other error middleware.
+// v8+ API: attaches its own Express error handler to the app.
 if (config.sentry.dsn) {
-  app.use(Sentry.Handlers.errorHandler());
+  Sentry.setupExpressErrorHandler(app);
 }
 
 // Global Error Handler

@@ -35,7 +35,8 @@ jobs:
       env:
         NODE_ENV: test
         MONGO_URI: mongodb://127.0.0.1:27017/agent-faq-test
-        JWT_SECRET: testsecret
+        JWT_SECRET: testsecret_ci_placeholder_value
+        MISTRAL_API_KEY: dummy_mistral_key_for_ci
         
   docker-build:
     needs: build
