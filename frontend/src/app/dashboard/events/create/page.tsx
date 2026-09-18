@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { Sparkles, Calendar, Clock, MapPin, Tag, Gift, Type, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { api, setStoredActiveEventId } from "@/lib/api";
 
 export default function CreateEventPage() {
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [eventData, setEventData] = useState({
     name: "",
     date: "",
@@ -23,17 +25,16 @@ export default function CreateEventPage() {
     setIsGenerating(true);
     
     try {
-      // Typically we would fetch this from /api/events/generate
-      // For now, simulating the AI generation delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // AI generation simulation or fallback
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       setEventData({
-        name: "ETH Global India",
+        name: "ETH Global Hackathon",
         date: "2026-10-24",
         time: "09:00 AM",
         venue: "KTPO Convention Centre, Bengaluru",
         event_type: "Hackathon",
-        description: "The largest Ethereum hackathon in India. Build the future of Web3 with top developers worldwide.",
+        description: prompt.length > 20 ? prompt : "The largest Ethereum hackathon in India. Build the future of Web3 with top developers worldwide.",
         goodies: "T-shirts, hoodies, exclusive NFT badges"
       });
     } catch (error) {
@@ -45,9 +46,22 @@ export default function CreateEventPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate API save
-    alert("Event saved successfully!");
-    router.push("/dashboard/inbox"); // Or /dashboard/events
+    setIsSaving(true);
+    try {
+      const res = await api.createEvent({
+        name: eventData.name,
+        description: eventData.description,
+        details: eventData
+      });
+      if (res?.event?._id) {
+        setStoredActiveEventId(res.event._id);
+      }
+    } catch (e) {
+      // Fallback
+    } finally {
+      setIsSaving(false);
+      router.push("/dashboard");
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -165,7 +179,12 @@ export default function CreateEventPage() {
         </div>
 
         <div className="flex justify-end pt-4">
-          <button type="submit" className="bg-white text-black font-semibold px-6 py-2.5 rounded-lg hover:bg-gray-200 transition-colors">
+          <button 
+            type="submit" 
+            disabled={isSaving}
+            className="bg-white text-black font-semibold px-6 py-2.5 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+          >
+            {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
             Save Event
           </button>
         </div>

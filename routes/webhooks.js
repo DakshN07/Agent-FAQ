@@ -31,33 +31,4 @@ router.post('/slack/:eventId', async (req, res) => {
     }
 });
 
-// WhatsApp Webhook Receiver
-// URL should be /api/webhooks/whatsapp/:eventId
-router.post('/whatsapp/:eventId', async (req, res) => {
-    const eventId = req.params.eventId;
-
-    // For Meta Webhooks, verify token
-    if (req.query['hub.mode'] === 'subscribe' && req.query['hub.verify_token']) {
-        // usually you'd verify against your saved verification token.
-        return res.status(200).send(req.query['hub.challenge']);
-    }
-
-    try {
-        const adapter = integrationManager.getAdapter(eventId, 'whatsapp');
-        if (!adapter) {
-            return res.status(404).send('WhatsApp integration not active for this event');
-        }
-
-        const normalizedMsg = adapter.parseWebhook(req.body);
-        if (normalizedMsg) {
-            integrationManager.handleIncomingMessage(normalizedMsg).catch(console.error);
-        }
-
-        res.status(200).send('EVENT_RECEIVED');
-    } catch (error) {
-        console.error("Webhook processing error:", error);
-        res.status(500).send('Internal Server Error');
-    }
-});
-
 module.exports = router;

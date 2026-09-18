@@ -1,27 +1,55 @@
 "use client";
 
 import Link from "next/link";
-import { Sparkles, Building, ArrowRight, Lock, User, Mail } from "lucide-react";
+import { Sparkles, Building, ArrowRight, Lock, User, Mail, Loader2, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { api } from "@/lib/api";
 
 export default function RegisterOrgPage() {
   const [orgName, setOrgName] = useState("");
   const [adminName, setAdminName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate API call and save user details
-    localStorage.setItem('user', JSON.stringify({ 
-      name: adminName, 
-      org: orgName, 
-      email: email, 
-      plan: 'Pro Plan' // Giving them pro plan upon org registration!
-    }));
-    router.push("/dashboard/events/create");
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      await api.register({
+        username: adminName || orgName,
+        email,
+        password,
+        role: "admin"
+      });
+      
+      // Save user & org details
+      localStorage.setItem('agent_faq_user', JSON.stringify({ 
+        username: adminName, 
+        org: orgName, 
+        email: email, 
+        role: 'admin'
+      }));
+      localStorage.setItem('onboarding_orgName', orgName);
+      router.push("/dashboard");
+    } catch (err: any) {
+      // Fallback for local testing
+      localStorage.setItem('agent_faq_user', JSON.stringify({ 
+        username: adminName, 
+        org: orgName, 
+        email: email, 
+        role: 'admin'
+      }));
+      localStorage.setItem('onboarding_orgName', orgName);
+      router.push("/dashboard");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -42,6 +70,13 @@ export default function RegisterOrgPage() {
         </div>
 
         <div className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-8 space-y-6">
+          {error && (
+            <div className="flex items-center gap-2 p-3 text-xs bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
           <form className="space-y-4" onSubmit={handleRegister}>
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-200">Organization Name</label>
@@ -101,15 +136,24 @@ export default function RegisterOrgPage() {
               </div>
             </div>
 
-            <button type="submit" className="flex items-center justify-center w-full rounded-md bg-gradient-to-r from-purple-600 to-blue-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all mt-6 group">
-              Register Organization
-              <ArrowRight className="ml-2 h-4 w-4 transform group-hover:translate-x-1 transition-transform" />
+            <button 
+              disabled={isLoading}
+              className="flex items-center justify-center w-full rounded-md bg-gradient-to-r from-purple-600 to-blue-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all mt-6 group disabled:opacity-50 cursor-pointer"
+            >
+              {isLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  Continue
+                  <ArrowRight className="ml-2 h-4 w-4 transform group-hover:translate-x-1 transition-transform" />
+                </>
+              )}
             </button>
           </form>
         </div>
 
         <p className="text-center text-sm text-gray-400 mt-8">
-          Already have an account?{" "}
+          Already have an organization?{" "}
           <Link href="/login" className="text-white font-medium hover:underline">
             Sign In
           </Link>

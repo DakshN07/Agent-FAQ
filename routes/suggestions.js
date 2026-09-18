@@ -1,15 +1,12 @@
 const express = require('express');
 const router = express.Router({ mergeParams: true });
 const UnknownQuestion = require('../models/UnknownQuestion');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, authorizeEvent } = require('../middleware/auth');
 
 // Simple suggestions based on unknown questions per event
-router.get('/', authenticate, async (req, res) => {
+router.get('/', authenticate, authorizeEvent(), async (req, res, next) => {
   try {
-    const eventId = req.query.eventId;
-    if (!eventId) return res.status(400).json({ error: 'eventId required' });
-
-    const unknowns = await UnknownQuestion.find({ eventId });
+    const unknowns = await UnknownQuestion.find({ eventId: req.event._id });
 
     // Simple logic: if asked > 1 times, suggest it
     const suggestions = unknowns
@@ -32,7 +29,7 @@ router.get('/', authenticate, async (req, res) => {
     });
   } catch (error) {
     console.error('Error generating suggestions:', error);
-    res.status(500).json({ error: 'Failed to generate suggestions' });
+    next(error);
   }
 });
 

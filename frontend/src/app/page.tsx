@@ -135,7 +135,7 @@ export default function HomePage() {
                   transition={{ delay: 0.3, ease: easeCurve }}
                   className="text-base md:text-lg text-gray-400 max-w-2xl mx-auto leading-relaxed"
                 >
-                  Connect Discord, Slack, Telegram and WhatsApp. Let AI answer, learn and improve automatically.
+                  Connect Discord, Slack, and Telegram. Let AI answer, learn and improve automatically.
                 </motion.p>
               </div>
 

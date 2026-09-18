@@ -1,77 +1,118 @@
 const express = require('express');
 const router = express.Router();
 const Faq = require('../models/Faq');
+const Event = require('../models/Event');
 const { getEmbedding } = require('../services/embedding');
+const { authenticate, authorizeEvent } = require('../middleware/auth');
+
+// All FAQ routes require authentication.
+router.use(authenticate);
+
+/**
+ * Loads the FAQ at :id and verifies the caller has access to its event.
+ * Attaches req.faq.
+ */
+const authorizeFaq = async (req, res, next) => {
+    try {
+        let faq;
+        try {
+            faq = await Faq.findById(req.params.id);
+        } catch (e) {
+            return res.status(400).json({ error: 'Invalid FAQ id' });
+        }
+        if (!faq) return res.status(404).json({ error: 'FAQ not found' });
+
+        // A FAQ must belong to an event to be access-controlled.
+        if (!faq.eventId) {
+            return res.status(403).json({ error: 'FAQ is not associated with an event' });
+        }
+
+        const event = await Event.findById(faq.eventId);
+        if (!event) return res.status(404).json({ error: 'Event not found' });
+
+        const isManager = event.managerId && event.managerId.toString() === req.user.id.toString();
+        if (!isManager) {
+            const EventMember = require('../models/EventMember');
+            const membership = await EventMember.findOne({
+                eventId: event._id,
+                userId: req.user.id,
+                status: 'Active',
+            });
+            if (!membership) {
+                return res.status(403).json({ error: 'You do not have access to this FAQ' });
+            }
+        }
+
+        req.faq = faq;
+        next();
+    } catch (error) {
+        next(error);
+    }
+};
 
 // GET all FAQs for an event
-router.get('/', async (req, res) => {
+router.get('/', authorizeEvent(), async (req, res, next) => {
     try {
-        const eventId = req.query.eventId;
-        if (!eventId || eventId === 'undefined') {
-            return res.status(400).json({ error: 'eventId is required' });
-        }
-        const faqs = await Faq.find({ eventId }).sort({ _id: -1 });
+        const faqs = await Faq.find({ eventId: req.event._id }).sort({ _id: -1 });
         res.json(faqs);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        next(error);
     }
 });
 
 // POST new FAQ
-router.post('/', async (req, res) => {
+router.post('/', authorizeEvent(), async (req, res, next) => {
     try {
-        const { question, answer, eventId, platforms = [] } = req.body;
-        // Generate embedding
+        const { question, answer, platforms = [] } = req.body;
+        if (!question || !answer) {
+            return res.status(400).json({ error: 'question and answer are required' });
+        }
+
         const embedding = await getEmbedding(question);
 
         const newFaq = new Faq({
-            eventId,
+            eventId: req.event._id,
             question,
             answer,
-            platforms,
-            embedding
+            platforms: Array.isArray(platforms) ? platforms : [],
+            embedding: embedding || undefined,
         });
         await newFaq.save();
         res.status(201).json(newFaq);
     } catch (error) {
-        console.error("Error creating FAQ:", error);
-        res.status(500).json({ error: error.message });
+        next(error);
     }
 });
 
 // PUT update FAQ
-router.put('/:id', async (req, res) => {
+router.put('/:id', authorizeFaq, async (req, res, next) => {
     try {
         const { question, answer, platforms } = req.body;
 
-        let updateData = { question, answer, platforms };
+        const updateData = {};
+        if (question !== undefined) updateData.question = question;
+        if (answer !== undefined) updateData.answer = answer;
+        if (platforms !== undefined) updateData.platforms = platforms;
+
         if (question) {
             const embedding = await getEmbedding(question);
-            if (embedding) {
-                updateData.embedding = embedding;
-            }
+            if (embedding) updateData.embedding = embedding;
         }
 
-        const updatedFaq = await Faq.findByIdAndUpdate(req.params.id, updateData, { new: true });
-        if (!updatedFaq) {
-            return res.status(404).json({ error: 'FAQ not found' });
-        }
+        const updatedFaq = await Faq.findByIdAndUpdate(req.faq._id, updateData, { new: true });
         res.json(updatedFaq);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        next(error);
     }
 });
 
 // DELETE FAQ
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authorizeFaq, async (req, res, next) => {
     try {
-        const deletedFaq = await Faq.findByIdAndDelete(req.params.id);
-        if (!deletedFaq) {
-            return res.status(404).json({ error: 'FAQ not found' });
-        }
+        await Faq.findByIdAndDelete(req.faq._id);
         res.json({ message: 'FAQ deleted successfully' });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        next(error);
     }
 });
 

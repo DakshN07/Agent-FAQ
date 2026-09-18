@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Agent-FAQ | Omnichannel AI Support OS",
-  description: "Autonomous AI support agent for Discord, Telegram, Slack, and WhatsApp.",
+  description: "Autonomous AI support agent for Discord, Telegram, and Slack.",
 };
 
 export default function RootLayout({

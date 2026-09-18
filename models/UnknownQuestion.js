@@ -27,7 +27,7 @@ const unknownQuestionSchema = new mongoose.Schema({
     type: String,
   },
   sourcePlatform: {
-    type: String, // e.g. discord, slack, whatsapp
+    type: String, // e.g. discord, slack, telegram
   },
   channelId: {
     type: String,

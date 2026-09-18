@@ -44,10 +44,6 @@ class IntegrationManager {
             case 'telegram':
                 adapterInstance = new TelegramAdapter(integration.eventId, {}, { token: process.env.TELEGRAM_BOT_TOKEN, ...integration.credentials }, this.handleIncomingMessage.bind(this));
                 break;
-            case 'whatsapp':
-                const WhatsappAdapter = require('../adapters/WhatsappAdapter');
-                adapterInstance = new WhatsappAdapter(integration.eventId, {}, { ...integration.credentials }, this.handleIncomingMessage.bind(this));
-                break;
             default:
                 console.log(`[IntegrationManager] Unrecognized platform: ${integration.platform}`);
                 return;

@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const jwt = require('jsonwebtoken');
+const config = require('../config/env');
 
 // Create a reusable transporter object using the default SMTP transport.
 // For production, you should use SendGrid, Resend, or AWS SES.
@@ -23,15 +24,15 @@ async function sendTeamInvite(toEmail, orgName, eventId) {
   // Generate a magic link JWT token
   const token = jwt.sign(
     { email: toEmail, organization: orgName, eventId: eventId },
-    process.env.JWT_SECRET || 'supersecret_invite_key',
+    config.jwt.secret,
     { expiresIn: '7d' } // Invite expires in 7 days
   );
 
   // The link that the "Let's Go" button will redirect to
-  const inviteLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/invite?token=${token}`;
+  const inviteLink = `${config.frontendUrl}/invite?token=${token}`;
 
   // Read the banner image URL or cid
-  const bannerUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/email-banner.png`;
+  const bannerUrl = `${config.frontendUrl}/email-banner.png`;
 
   const htmlContent = `
     <!DOCTYPE html>

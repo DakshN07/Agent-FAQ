@@ -46,7 +46,7 @@ app.use(express.json({ limit: '10kb' })); // Prevent large payload attacks
 
 // Redis Client
 let redisClient;
-if (config.redis.url) {
+if (config.redis.url && process.env.NODE_ENV !== 'test') {
   redisClient = createClient({
     url: config.redis.url
   });
@@ -110,7 +110,9 @@ const connectDB = async (retries = 5) => {
     }
   }
 };
-connectDB();
+if (process.env.NODE_ENV !== 'test') {
+  connectDB();
+}
 
 // Use Routes
 if (routes) app.use('/api', routes);

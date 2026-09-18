@@ -1,6 +1,6 @@
 #  FAQ Agent — Smart Omnichannel FAQ Bot
 
-> **A full-stack FAQ management system with AI-powered semantic matching, built with Next.js, Node.js, and MongoDB. (Includes integrations for Discord, Slack, Telegram, and WhatsApp)**
+> **A full-stack FAQ management system with AI-powered semantic matching, built with Next.js, Node.js, and MongoDB. (Includes integrations for Discord, Slack, and Telegram)**
 
 [![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=flat&logo=vercel)](https://vercel.com)
 [![Backend on Render](https://img.shields.io/badge/Backend%20on-Render-00ADD8?style=flat&logo=render)](https://render.com)
@@ -27,7 +27,7 @@
 ##  Features
 
 ###  **Omnichannel Support**
-- **Multiple Platforms**: Native adapters for Discord, Slack, Telegram, and WhatsApp.
+- **Multiple Platforms**: Native adapters for Discord, Slack, and Telegram.
 - **Unified Management**: Manage FAQs for all platforms from a single dashboard.
 
 ###  **AI-Powered FAQ Matching**
@@ -110,7 +110,7 @@ The project is currently undergoing a frontend migration from a legacy Vite/Reac
 
 ```text
 Agent-FAQ/
-├── 📁 adapters/               # Integration adapters (Discord, Slack, Telegram, Whatsapp)
+├── 📁 adapters/               # Integration adapters (Discord, Slack, Telegram)
 ├── 📁 backend/                # Core AI logic (embedding, similarity)
 ├── 📁 config/                 # Environment and app configuration
 ├── 📁 frontend/               # Next.js frontend application (Active)

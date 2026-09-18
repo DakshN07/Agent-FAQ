@@ -12,10 +12,15 @@ export default function SettingsPage() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('user');
+    const savedUser = localStorage.getItem('agent_faq_user') || localStorage.getItem('user');
     if (savedUser) {
       try {
-        setUser(JSON.parse(savedUser));
+        const parsed = JSON.parse(savedUser);
+        setUser({
+          name: parsed.username || parsed.name || "",
+          email: parsed.email || "",
+          org: parsed.org || "Agent-FAQ Organization"
+        });
       } catch (e) {}
     }
   }, []);

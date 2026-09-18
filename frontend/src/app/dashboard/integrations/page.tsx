@@ -32,14 +32,6 @@ const INTEGRATIONS = [
     color: "text-sky-400 bg-sky-400/10",
     status: "available",
     action: "oauth"
-  },
-  {
-    name: "WhatsApp",
-    description: "Deploy the agent to a WhatsApp Business account.",
-    icon: MessageSquare,
-    color: "text-green-500 bg-green-500/10",
-    status: "available",
-    action: "oauth"
   }
 ];
 

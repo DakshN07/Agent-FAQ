@@ -7,11 +7,14 @@ import {
   Sparkles, ShieldCheck, ChevronRight, Activity, Bell, Wifi, Radio, AlertTriangle
 } from "lucide-react";
 import DashboardViews from "@/components/DashboardViews";
+import { api, getStoredActiveEventId, setStoredActiveEventId, getStoredUser } from "@/lib/api";
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState("Overview");
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [orgName, setOrgName] = useState("Acme Events Corp");
+  const [activeEventId, setActiveEventId] = useState<string>("");
+  const [userInitial, setUserInitial] = useState("A");
   const [connectedChannels, setConnectedChannels] = useState<string[]>([]);
   const [alerts, setAlerts] = useState<string[]>([
     "Prompt Injection blocked in Slack #support",
@@ -19,9 +22,15 @@ export default function DashboardPage() {
     "New spammer flagged on Telegram: @user123"
   ]);
 
-  // Load configuration from conversational onboarding if available
+  // Load user & events from API or localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
+      const user = getStoredUser();
+      if (user) {
+        if (user.org) setOrgName(user.org);
+        if (user.username) setUserInitial(user.username.charAt(0).toUpperCase());
+      }
+
       const storedOrg = localStorage.getItem("onboarding_orgName");
       if (storedOrg) setOrgName(storedOrg);
       
@@ -30,11 +39,20 @@ export default function DashboardPage() {
         try {
           setConnectedChannels(JSON.parse(storedChannels));
         } catch (e) {
-          setConnectedChannels(["Discord", "Telegram", "WhatsApp"]);
+          setConnectedChannels(["Discord", "Telegram", "Slack"]);
         }
       } else {
-        setConnectedChannels(["Discord", "Telegram", "WhatsApp"]);
+        setConnectedChannels(["Discord", "Telegram", "Slack"]);
       }
+
+      // Try fetching events
+      api.getEvents().then((events) => {
+        if (Array.isArray(events) && events.length > 0) {
+          setActiveEventId(events[0]._id);
+          setStoredActiveEventId(events[0]._id);
+          if (events[0].name) setOrgName(events[0].name);
+        }
+      }).catch(() => {});
     }
   }, []);
 
@@ -90,7 +108,7 @@ export default function DashboardPage() {
           </div>
           <div className="h-4 w-px bg-white/10" />
           <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center font-bold text-xs text-white border border-white/5">
-            A
+            {userInitial}
           </div>
         </div>
       </header>
@@ -155,7 +173,7 @@ export default function DashboardPage() {
 
         {/* PANEL 2: CENTER WORKSPACE (Dynamic content) */}
         <div className="flex-1 glass border border-white/5 rounded-2xl overflow-hidden shadow-lg bg-[#0c0c0e]/40 relative">
-          <DashboardViews activeTab={activeTab} connectedChannels={connectedChannels} />
+          <DashboardViews activeTab={activeTab} connectedChannels={connectedChannels} eventId={activeEventId} />
         </div>
 
         {/* PANEL 3: RIGHT CONTEXT PANEL (Telemetry Assistant) */}
@@ -183,7 +201,7 @@ export default function DashboardPage() {
             <div className="space-y-3">
               <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Live Channels status</span>
               <div className="space-y-2">
-                {["Discord", "Telegram", "WhatsApp", "Slack"].map((channel) => {
+                {["Discord", "Telegram", "Slack"].map((channel) => {
                   const isActive = connectedChannels.includes(channel) || channel === "Discord" || channel === "Telegram";
                   return (
                     <div key={channel} className="flex items-center justify-between text-xs px-2.5 py-2 rounded-lg bg-white/2 border border-white/2">

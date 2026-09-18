@@ -15,12 +15,14 @@ const widgetRouter = require('./widget');
 
 const conversationsRouter = require('./conversations');
 const moderationRouter = require('./moderation');
+const aiRouter = require('./ai');
 
 router.use('/faqs', faqsRouter);
 router.use('/settings', settingsRouter);
 router.use('/analytics', analyticsRouter);
 router.use('/suggestions', suggestionsRouter);
 router.use('/unknown-questions', unknownQuestionsRouter);
+router.use('/ai', aiRouter);
 router.use('/events', eventsRouter);
 eventsRouter.use('/:eventId/integrations', integrationsRouter);
 eventsRouter.use('/:eventId/team', teamRouter);

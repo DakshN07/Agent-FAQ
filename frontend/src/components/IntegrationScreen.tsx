@@ -24,8 +24,7 @@ export default function IntegrationScreen({ selectedChannels, orgName, onComplet
   const [integrations, setIntegrations] = useState<IntegrationState[]>([
     { id: "Discord", name: "Discord Bot", iconColor: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20", connected: false, connecting: false, syncTime: 0, flowCount: 0 },
     { id: "Telegram", name: "Telegram Bot", iconColor: "text-blue-400 bg-blue-500/10 border-blue-500/20", connected: false, connecting: false, syncTime: 0, flowCount: 0 },
-    { id: "Slack", name: "Slack App", iconColor: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20", connected: false, connecting: false, syncTime: 0, flowCount: 0 },
-    { id: "WhatsApp", name: "WhatsApp Cloud API", iconColor: "text-green-400 bg-green-500/10 border-green-500/20", connected: false, connecting: false, syncTime: 0, flowCount: 0 }
+    { id: "Slack", name: "Slack App", iconColor: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20", connected: false, connecting: false, syncTime: 0, flowCount: 0 }
   ]);
 
   // Handle auto-population of initial user selections from onboarding step

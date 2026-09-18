@@ -6,7 +6,7 @@ const EventMemberSchema = new mongoose.Schema({
     email: { type: String, required: true }, // Store email for invites
     role: { type: String, enum: ['admin', 'agent'], default: 'agent' },
     status: { type: String, enum: ['Pending', 'Active', 'Removed'], default: 'Pending' },
-    platformAccess: [{ type: String, enum: ['discord', 'slack', 'whatsapp', 'telegram', 'web'] }],
+    platformAccess: [{ type: String, enum: ['discord', 'slack', 'telegram', 'web'] }],
     addedAt: { type: Date, default: Date.now },
 });
 

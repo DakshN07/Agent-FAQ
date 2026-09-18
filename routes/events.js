@@ -58,7 +58,7 @@ router.post('/', authenticate, async (req, res) => {
                         eventId: newEvent._id,
                         question: p.question,
                         answer: p.answer,
-                        platforms: ['discord', 'slack', 'whatsapp', 'telegram'],
+                        platforms: ['discord', 'slack', 'telegram'],
                         embedding: embedding || []
                     });
                     await faq.save();
@@ -68,7 +68,7 @@ router.post('/', authenticate, async (req, res) => {
                         eventId: newEvent._id,
                         question: p.question,
                         answer: p.answer,
-                        platforms: ['discord', 'slack', 'whatsapp', 'telegram'],
+                        platforms: ['discord', 'slack', 'telegram'],
                         embedding: []
                     });
                     await faq.save();
@@ -120,7 +120,7 @@ router.post('/join', authenticate, async (req, res) => {
             eventId: event._id,
             userId: req.user.id,
             role: 'agent',
-            platformAccess: ['discord', 'slack', 'whatsapp', 'telegram'] // Default all access for now
+            platformAccess: ['discord', 'slack', 'telegram'] // Default all access for now
         });
         await newMember.save();
 

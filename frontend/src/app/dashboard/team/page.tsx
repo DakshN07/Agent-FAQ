@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { Users, UserPlus, Mail, Shield, MoreVertical, Trash2, Edit, X, Loader2 } from "lucide-react";
+import { api, getStoredActiveEventId } from "@/lib/api";
 
-// For demo purposes, we will mock API calls if they fail
 const mockMembers = [
-  { _id: '1', email: "alice@acme.com", userId: { username: "Alice Admin" }, role: "Owner", status: "Active" },
-  { _id: '2', email: "bob@acme.com", userId: { username: "Bob Builder" }, role: "Editor", status: "Active" },
-  { _id: '3', email: "charlie@acme.com", userId: null, role: "Viewer", status: "Pending" },
-  { _id: '4', email: "dave@acme.com", userId: { username: "Dave" }, role: "Viewer", status: "Removed" },
+  { _id: '1', email: "alice@acme.com", userId: { username: "Alice Admin" }, role: "admin", status: "Active" },
+  { _id: '2', email: "bob@acme.com", userId: { username: "Bob Builder" }, role: "agent", status: "Active" },
+  { _id: '3', email: "charlie@acme.com", userId: null, role: "agent", status: "Pending" },
+  { _id: '4', email: "dave@acme.com", userId: { username: "Dave" }, role: "agent", status: "Removed" },
 ];
 
 export default function TeamPage() {
@@ -17,17 +17,29 @@ export default function TeamPage() {
   
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState("Viewer");
+  const [inviteRole, setInviteRole] = useState("agent");
   const [isInviting, setIsInviting] = useState(false);
 
-  // In a real app, fetch members here:
-  // useEffect(() => { fetchMembers() }, [])
+  const eventId = getStoredActiveEventId() || "default_event";
+
+  useEffect(() => {
+    async function loadMembers() {
+      try {
+        const members = await api.getTeamMembers(eventId);
+        if (Array.isArray(members) && members.length > 0) {
+          setTeamMembers(members);
+        }
+      } catch (e) {}
+    }
+    loadMembers();
+  }, [eventId]);
 
   const removeMember = async (id: string) => {
-    // Optimistic UI update
+    try {
+      await api.removeTeamMember(eventId, id);
+    } catch (e) {}
     setTeamMembers(teamMembers.map(m => m._id === id ? { ...m, status: "Removed" } : m));
     setOpenMenuId(null);
-    // Real app: await fetch(`/api/team/${id}`, { method: 'DELETE' })
   };
 
   const handleInvite = async (e: React.FormEvent) => {
@@ -36,8 +48,20 @@ export default function TeamPage() {
     
     setIsInviting(true);
     
-    // Simulate API call to /api/team/invite
-    setTimeout(() => {
+    try {
+      const newMember = await api.inviteTeamMember(eventId, {
+        email: inviteEmail,
+        role: inviteRole,
+        platformAccess: ['discord', 'slack', 'telegram']
+      });
+      setTeamMembers([...teamMembers, newMember || { 
+        _id: Date.now().toString(), 
+        email: inviteEmail, 
+        userId: null,
+        role: inviteRole, 
+        status: "Pending" 
+      }]);
+    } catch (err) {
       setTeamMembers([...teamMembers, { 
         _id: Date.now().toString(), 
         email: inviteEmail, 
@@ -45,10 +69,11 @@ export default function TeamPage() {
         role: inviteRole, 
         status: "Pending" 
       }]);
+    } finally {
       setIsInviting(false);
       setIsInviteModalOpen(false);
       setInviteEmail("");
-    }, 1000);
+    }
   };
 
   return (

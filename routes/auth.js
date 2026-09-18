@@ -2,8 +2,9 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const config = require('../config/env');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_jwt_key';
+const JWT_SECRET = config.jwt.secret;
 const { authenticate } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const authValidation = require('../validations/auth.validation');

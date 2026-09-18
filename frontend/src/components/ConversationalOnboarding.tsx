@@ -22,7 +22,7 @@ export default function ConversationalOnboarding({ onComplete, onBackToLanding }
   const [data, setData] = useState<OnboardingData>({
     buildingType: "",
     orgName: "",
-    channels: ["Discord", "Telegram", "WhatsApp"], // Discord, Telegram, WhatsApp checked by default, Slack unchecked
+    channels: ["Discord", "Telegram", "Slack"], // Discord, Telegram, Slack checked by default
     expectedMessages: "",
     aiGoals: [],
   });
@@ -70,7 +70,7 @@ export default function ConversationalOnboarding({ onComplete, onBackToLanding }
   const buildingOptions = ["SaaS", "Community", "Event", "E-Commerce", "Agency", "Startup", "Other"];
 
   // Step 3 Options
-  const channelOptions = ["Discord", "Telegram", "Slack", "WhatsApp"];
+  const channelOptions = ["Discord", "Telegram", "Slack"];
 
   // Step 4 Options
   const messageOptions = ["<1000", "1000-5000", "5000-25000", "25000+"];

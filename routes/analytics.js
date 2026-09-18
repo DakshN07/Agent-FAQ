@@ -3,13 +3,11 @@ const router = express.Router();
 const Analytics = require('../models/Analytics');
 const UnknownQuestion = require('../models/UnknownQuestion');
 const Faq = require('../models/Faq');
+const { authenticate, authorizeEvent } = require('../middleware/auth');
 
-router.get('/', async (req, res) => {
+router.get('/', authenticate, authorizeEvent(), async (req, res, next) => {
     try {
-        const eventId = req.query.eventId;
-        if (!eventId || eventId === 'undefined') {
-            return res.status(400).json({ error: 'eventId is required' });
-        }
+        const eventId = req.event._id;
         const query = { eventId };
 
         // Aggregate stats
@@ -20,7 +18,7 @@ router.get('/', async (req, res) => {
         const analytics = await Analytics.find(query);
         let matched = 0;
         let totalQueries = 0;
-        let perPlatform = { discord: 0, slack: 0, whatsapp: 0, web: 0 };
+        let perPlatform = { discord: 0, slack: 0, telegram: 0, web: 0 };
 
         for (const a of analytics) {
             matched += (a.matchedQueries || 0);
@@ -73,7 +71,7 @@ router.get('/', async (req, res) => {
             }
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        next(error);
     }
 });
 
