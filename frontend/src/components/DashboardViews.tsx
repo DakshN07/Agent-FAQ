@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Sparkles, MessageSquare, Bot, Database, BarChart3, Shield, Settings, 
@@ -139,83 +139,142 @@ function InboxView({ eventId }: { eventId: string }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedTicketId, setSelectedTicketId] = useState<string>("");
   const [chatInput, setChatInput] = useState("");
+  const [sendingReply, setSendingReply] = useState(false);
+  const [replyError, setReplyError] = useState<string | null>(null);
   const [activeChannelFilter, setActiveChannelFilter] = useState<"All" | "Discord" | "Telegram" | "Slack" | "Web">("All");
 
-  useEffect(() => {
-    if (!eventId || eventId === "default_event") {
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    async function loadConversations() {
-      try {
-        setLoading(true);
-        setLoadError(null);
-        const convs = await api.getConversations(eventId);
-        if (cancelled) return;
-        if (!Array.isArray(convs)) {
-          setTickets([]);
-          return;
-        }
-        const mapped: Ticket[] = convs.map((c: any) => {
-          const platform = (c.platform || c.sourcePlatform || 'web').toLowerCase();
-          const channel = platform.includes('discord') ? "Discord"
-            : platform.includes('slack') ? "Slack"
-            : platform.includes('telegram') ? "Telegram" : "Web";
-          return {
-            id: c._id,
-            user: c.userId?.username || c.userId?.email || c.senderName || "Anonymous",
-            issue: c.subject || c.lastMessage?.text || c.text || "Conversation",
-            channel,
-            status: c.status || "Pending",
-            time: c.lastMessageAt ? new Date(c.lastMessageAt).toLocaleString() : "",
-            messages: []
-          };
-        });
-        setTickets(mapped);
-        if (mapped.length > 0 && !cancelled) {
-          setSelectedTicketId((prev) => prev || mapped[0].id);
-        }
-      } catch (e: any) {
-        if (!cancelled) setLoadError(e?.message || "Could not load conversations");
-      } finally {
-        if (!cancelled) setLoading(false);
+  // Keep the latest selected conversation reachable from SSE handlers
+  // without re-subscribing the EventSource on every selection change.
+  const selectedRef = useRef(selectedTicketId);
+  useEffect(() => { selectedRef.current = selectedTicketId; }, [selectedTicketId]);
+
+  const mapConversation = (c: any): Ticket => {
+    const platform = (c.platform || c.sourcePlatform || 'web').toLowerCase();
+    const channel = platform.includes('discord') ? "Discord"
+      : platform.includes('slack') ? "Slack"
+      : platform.includes('telegram') ? "Telegram" : "Web";
+    return {
+      id: c._id,
+      user: c.userId?.username || c.userId?.email || c.senderName || "Anonymous",
+      issue: c.subject || c.lastMessage?.text || c.text || "Conversation",
+      channel,
+      status: c.status || "Pending",
+      time: c.lastMessageAt ? new Date(c.lastMessageAt).toLocaleString() : "",
+      messages: []
+    };
+  };
+
+  const refreshConversations = useCallback(async () => {
+    if (!eventId || eventId === "default_event") return;
+    try {
+      setLoadError(null);
+      const convs = await api.getConversations(eventId);
+      const list = convs.data || [];
+      if (!Array.isArray(list)) {
+        setTickets([]);
+        return;
       }
+      const mapped: Ticket[] = list.map(mapConversation);
+      setTickets((prev) => {
+        // Preserve previously loaded message threads for still-listed tickets.
+        const prevById = new Map(prev.map((t) => [t.id, t]));
+        const merged = mapped.map((t) => ({ ...t, messages: prevById.get(t.id)?.messages || [] }));
+        return merged;
+      });
+      setSelectedTicketId((prev) => prev || (mapped.length > 0 ? mapped[0].id : ""));
+    } catch (e: any) {
+      setLoadError(e?.message || "Could not load conversations");
+    } finally {
+      setLoading(false);
     }
-    loadConversations();
-    return () => { cancelled = true; };
   }, [eventId]);
 
-  // Load messages for the selected conversation from the API.
-  useEffect(() => {
-    if (!eventId || !selectedTicketId || eventId === "default_event") return;
-
-    setChatInput("");
-    setTickets((prev) => prev.map((t) => t.id === selectedTicketId ? { ...t, messages: [] } : t));
-
-    let cancelled = false;
-    async function loadMessages() {
-      try {
-        const msgs = await api.getMessages(eventId, selectedTicketId);
-        if (cancelled || !Array.isArray(msgs)) return;
-        const mapped: ChatMessage[] = msgs.map((m: any) => ({
-          sender: m.senderType === 'Agent' || m.isBot ? "AI Assistant"
-            : m.senderType === 'User' ? (m.senderName || "User")
-            : m.senderName || m.senderType || "User",
-          text: m.text || m.content || "",
-          time: m.createdAt ? new Date(m.createdAt).toLocaleString() : "",
-          isAi: m.senderType === 'Agent' || !!m.isBot
-        }));
-        setTickets((prev) =>
-          prev.map((t) => t.id === selectedTicketId ? { ...t, messages: mapped, status: mapped.length ? t.status : t.status } : t)
-        );
-      } catch {
-        // Leave the message thread empty; the chat area will show an empty state.
-      }
+  const reloadMessages = useCallback(async (convId: string) => {
+    if (!eventId || eventId === "default_event") return;
+    try {
+      const msgs = await api.getMessages(eventId, convId);
+      const list = msgs.data || [];
+      if (!Array.isArray(list)) return;
+      const mapped: ChatMessage[] = list.map((m: any) => ({
+        sender: m.senderType === 'Agent' || m.isBot ? "AI Assistant"
+          : m.senderType === 'Human' ? "You"
+          : m.senderName || m.senderType || "User",
+        text: m.text || m.content || "",
+        time: m.createdAt ? new Date(m.createdAt).toLocaleString() : "",
+        isAi: m.senderType === 'Agent' || !!m.isBot
+      }));
+      setTickets((prev) =>
+        prev.map((t) => t.id === convId ? { ...t, messages: mapped } : t)
+      );
+    } catch {
+      // Leave the thread as-is; the chat area shows an empty state.
     }
-    loadMessages();
-    return () => { cancelled = true; };
-  }, [eventId, selectedTicketId]);
+  }, [eventId]);
+
+  // Initial conversation load.
+  useEffect(() => {
+    refreshConversations();
+    return () => {};
+  }, [refreshConversations]);
+
+  // Load messages whenever the selected conversation changes.
+  useEffect(() => {
+    setChatInput("");
+    setReplyError(null);
+    if (selectedTicketId) {
+      reloadMessages(selectedTicketId);
+    }
+  }, [selectedTicketId, reloadMessages]);
+
+  // Live inbox: Server-Sent Events push new messages/conversations.
+  useEffect(() => {
+    if (!eventId || eventId === "default_event") return;
+
+    const handleSse = (payload: any) => {
+      const escape = payload ?? {};
+      // Refresh conversation list (status/timestamps/previews change).
+      refreshConversations();
+      // Refresh the thread ONLY if the event belongs to the open conversation.
+      if (String(escape.conversationId) === String(selectedRef.current)) {
+        reloadMessages(selectedRef.current);
+      }
+    };
+
+    let es: EventSource | null = null;
+    const connect = () => {
+      es = new EventSource(api.getConversationStreamUrl(eventId));
+      es.addEventListener("message", (e) => {
+        try { handleSse(JSON.parse(e.data)); } catch { /* ignore malformed */ }
+      });
+      es.addEventListener("conversation", (e) => {
+        try { handleSse(JSON.parse(e.data)); } catch { /* ignore malformed */ }
+      });
+      // 401 (expired access token), network blips: reconnect with a fresh
+      // token so the live inbox keeps working without a page reload.
+      es.onerror = () => {
+        es?.close();
+        setTimeout(connect, 5000);
+      };
+    };
+    connect();
+    return () => { es?.close(); };
+  }, [eventId, refreshConversations, reloadMessages]);
+
+  const sendReply = async () => {
+    const text = chatInput.trim();
+    if (!text || !selectedTicketId || !eventId || eventId === "default_event") return;
+    setSendingReply(true);
+    setReplyError(null);
+    try {
+      await api.sendManualReply(eventId, selectedTicketId, text);
+      setChatInput("");
+      await Promise.all([refreshConversations(), reloadMessages(selectedTicketId)]);
+    } catch (e: any) {
+      setReplyError(e?.message || "Could not send the reply");
+    } finally {
+      setSendingReply(false);
+    }
+  };
 
   const activeTicket = tickets.find((t) => t.id === selectedTicketId) || null;
 
@@ -335,16 +394,29 @@ function InboxView({ eventId }: { eventId: string }) {
 
             {/* Chat Input */}
             <div className="p-4 border-t border-white/5 bg-white/2">
-              <input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Manual replies are not enabled yet"
-                disabled
-                className="w-full py-3 px-4 bg-white/5 border border-white/5 rounded-xl text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-purple-500 transition-colors opacity-60 cursor-not-allowed"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && sendReply()}
+                  placeholder="Type a manual reply… (sent through the connected channel bot)"
+                  disabled={sendingReply}
+                  className="flex-1 py-3 px-4 bg-white/5 border border-white/5 rounded-xl text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
+                />
+                <button
+                  onClick={sendReply}
+                  disabled={sendingReply || !chatInput.trim()}
+                  className="px-4 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-600/30 disabled:cursor-not-allowed text-white rounded-xl transition-all cursor-pointer flex items-center justify-center shadow-md shadow-purple-500/10"
+                >
+                  {sendingReply ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                </button>
+              </div>
+              {replyError && (
+                <p className="text-[10px] text-red-400 mt-2 font-mono">{replyError}</p>
+              )}
               <p className="text-[9px] text-gray-500 text-center mt-2 font-mono">
-                Automated AI replies are sent through connected channels. Manual replies are coming soon.
+                Automated AI replies go out through connected channels. Manual replies are sent through the channel bot.
               </p>
             </div>
           </>
@@ -377,9 +449,15 @@ function AiAgentView({ eventId }: { eventId: string }) {
     setMessages((prev) => [...prev, { role: "user", content: prompt }]);
     setLoading(true);
 
+    if (!eventId || eventId === "default_event") {
+      setMessages((prev) => [...prev, { role: "agent", content: "Select an event first to use the AI console." }]);
+      setLoading(false);
+      return;
+    }
+
     try {
-      // Ask the backend AI service
-      const res = await api.askAI(prompt);
+      // Ask the backend AI service (same LangGraph pipeline as channel bots)
+      const res = await api.askAI(prompt, eventId);
       if (res && res.answer) {
         setMessages((prev) => [...prev, { role: "agent", content: res.answer }]);
         setLoading(false);

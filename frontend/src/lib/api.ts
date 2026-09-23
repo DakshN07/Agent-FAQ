@@ -2,26 +2,31 @@
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
-export const TOKEN_KEY = 'agent_faq_token';
+// --------------------------------------------------------------------------
+// Token handling
+//
+// The access token lives ONLY in JS memory (never localStorage, so a DOM XSS
+// can't exfiltrate it). It expires after 15 minutes; when a request returns
+// 401 the client transparently calls POST /api/auth/refresh, which rotates
+// the refresh token stored in the httpOnly `rf` cookie on the API origin,
+// then retries the original request once.
+// --------------------------------------------------------------------------
 export const USER_KEY = 'agent_faq_user';
 export const EVENT_KEY = 'agent_faq_active_event';
 
-export const getToken = (): string | null => {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(TOKEN_KEY);
-};
+let accessToken: string | null = null;
+let refreshPromise: Promise<boolean> | null = null;
+
+export const getToken = (): string | null => (typeof window === 'undefined' ? null : accessToken);
 
 export const setToken = (token: string): void => {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(TOKEN_KEY, token);
-  }
+  accessToken = token;
 };
 
 export const removeToken = (): void => {
+  accessToken = null;
   if (typeof window !== 'undefined') {
-    localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
-    localStorage.removeItem(EVENT_KEY);
   }
 };
 
@@ -53,15 +58,49 @@ export const setStoredActiveEventId = (eventId: string): void => {
   }
 };
 
-async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = getToken();
+/** Refresh the access token via the httpOnly refresh cookie. Dedupes concurrent calls. */
+async function refreshAccessToken(): Promise<boolean> {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!response.ok) return false;
+      const data = await response.json();
+      if (data.token) {
+        accessToken = data.token;
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  })().finally(() => {
+    refreshPromise = null;
+  });
+  return refreshPromise;
+}
+
+const AUTH_ENDPOINTS = [
+  '/api/auth/login',
+  '/api/auth/register',
+  '/api/auth/refresh',
+  '/api/auth/logout',
+  '/api/auth/accept-invite',
+];
+
+async function apiRequest<T>(endpoint: string, options: RequestInit = {}, retried = false): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string> || {}),
+    ...((options.headers as Record<string, string>) || {}),
   };
 
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
   }
 
   const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
@@ -69,7 +108,22 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
   const response = await fetch(url, {
     ...options,
     headers,
+    credentials: 'include', // round-trip the httpOnly refresh cookie
   });
+
+  // Transparent session refresh: on 401 (except for auth endpoints
+  // themselves), refresh then retry the original request once.
+  if (response.status === 401 && !retried && !AUTH_ENDPOINTS.some((e) => endpoint.startsWith(e))) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      return apiRequest<T>(endpoint, options, true);
+    }
+    removeToken();
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
+    throw new Error('Session expired. Please sign in again.');
+  }
 
   if (!response.ok) {
     let errorMsg = `API Error ${response.status}: ${response.statusText}`;
@@ -131,8 +185,23 @@ export const api = {
     return data;
   },
 
-  logout() {
-    removeToken();
+  /** Changes the password; clears the session (server revokes all refresh sessions). */
+  async changePassword(body: { currentPassword: string; newPassword: string }) {
+    return apiRequest<{ message: string }>('/api/auth/password', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
+  },
+
+  async logout() {
+    try {
+      await apiRequest<{ message: string }>('/api/auth/logout', {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+    } finally {
+      removeToken();
+    }
   },
 
   // Events
@@ -229,14 +298,38 @@ export const api = {
     return apiRequest<any[]>(`/api/events/${eventId}/moderation`);
   },
 
-  // Conversations & Messages
-  async getConversations(eventId: string, status?: string) {
-    const query = status && status !== 'All' ? `?status=${status}` : '';
-    return apiRequest<any[]>(`/api/events/${eventId}/conversations${query}`);
+  // Conversations & Messages (paginated)
+  async getConversations(eventId: string, status?: string, page = 1, limit = 20) {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (status && status !== 'All') params.set('status', status);
+    return apiRequest<{ data: any[]; total: number; page: number; totalPages: number }>(
+      `/api/events/${eventId}/conversations?${params.toString()}`
+    );
   },
 
-  async getMessages(eventId: string, conversationId: string) {
-    return apiRequest<any[]>(`/api/events/${eventId}/conversations/${conversationId}/messages`);
+  async getMessages(eventId: string, conversationId: string, page = 1, limit = 50) {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    return apiRequest<{ data: any[]; total: number; page: number; totalPages: number }>(
+      `/api/events/${eventId}/conversations/${conversationId}/messages?${params.toString()}`
+    );
+  },
+
+  /** Sends a human (manual) reply through the conversation's channel bot. */
+  async sendManualReply(eventId: string, conversationId: string, text: string) {
+    return apiRequest<any>(`/api/events/${eventId}/conversations/${conversationId}/reply`, {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    });
+  },
+
+  /**
+   * Live inbox stream URL (Server-Sent Events). EventSource can't set an
+   * Authorization header, so the short-lived access token is passed via
+   * ?token=. Callers must close the EventSource on unmount.
+   */
+  getConversationStreamUrl(eventId: string): string {
+    const token = getToken() || '';
+    return `${API_BASE_URL}/api/events/${encodeURIComponent(eventId)}/conversations/stream?token=${encodeURIComponent(token)}`;
   },
 
   // Integrations
@@ -269,8 +362,12 @@ export const api = {
     });
   },
 
-  // AI Ask
-  async askAI(question: string) {
-    return apiRequest<{ answer: string }>(`/api/ai/ask?question=${encodeURIComponent(question)}`);
+  // AI Ask — runs the same LangGraph pipeline as the channel bots
+  async askAI(question: string, eventId?: string) {
+    const params = new URLSearchParams({ question });
+    if (eventId) params.set('eventId', eventId);
+    return apiRequest<{ answer: string; confidence: number; matched: boolean }>(
+      `/api/ai/ask?${params.toString()}`
+    );
   },
 };

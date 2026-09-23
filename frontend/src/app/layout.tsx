@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import LenisProvider from "@/components/LenisProvider";
 import CustomCursor from "@/components/CustomCursor";
+import SentryProvider from "@/components/SentryProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -21,7 +22,7 @@ export default function RootLayout({
       <body className={`${inter.className} min-h-screen bg-background text-foreground antialiased overflow-x-hidden select-none`}>
         <LenisProvider>
           <CustomCursor />
-          {children}
+          <SentryProvider>{children}</SentryProvider>
         </LenisProvider>
       </body>
     </html>

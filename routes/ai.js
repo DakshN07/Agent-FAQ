@@ -25,7 +25,12 @@ router.get('/ask', authenticate, async (req, res, next) => {
   if (!eventId) return res.status(400).json({ error: 'eventId is required' });
 
   try {
-    const event = await Event.findById(eventId);
+    let event;
+    try {
+      event = await Event.findById(eventId);
+    } catch {
+      return res.status(400).json({ error: 'Invalid eventId' });
+    }
     if (!event) return res.status(404).json({ error: 'Event not found' });
 
     const isManager = event.managerId && event.managerId.toString() === req.user.id.toString();

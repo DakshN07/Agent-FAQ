@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   MessageSquare, Clock, MoreVertical,
-  Bot, User as UserIcon, CheckCircle2
+  Bot, User as UserIcon, CheckCircle2, Send
 } from "lucide-react";
 import { api, getStoredActiveEventId } from "@/lib/api";
 
@@ -16,6 +16,8 @@ export default function UnifiedInbox() {
   const [filter, setFilter] = useState("All");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [sendingReply, setSendingReply] = useState(false);
+  const [replyError, setReplyError] = useState<string | null>(null);
 
   const eventId = getStoredActiveEventId() || "";
 
@@ -29,7 +31,8 @@ export default function UnifiedInbox() {
     api.getConversations(eventId)
       .then((convs) => {
         if (cancelled) return;
-        if (Array.isArray(convs)) setConversations(convs);
+        const list = convs.data || [];
+        if (Array.isArray(list)) setConversations(list);
       })
       .catch((e: any) => {
         if (!cancelled) setLoadError(e?.message || "Could not load conversations");
@@ -43,12 +46,32 @@ export default function UnifiedInbox() {
   const handleSelectConv = (conv: any) => {
     setSelectedConv(conv);
     setMessages([]);
+    setReplyError(null);
     if (!eventId || !conv?._id) return;
     api.getMessages(eventId, conv._id)
       .then((msgs) => {
-        if (Array.isArray(msgs)) setMessages(msgs);
+        const list = msgs.data || [];
+        if (Array.isArray(list)) setMessages(list);
       })
       .catch(() => {});
+  };
+
+  const sendReply = async () => {
+    const text = replyText.trim();
+    if (!text || !eventId || !selectedConv?._id) return;
+    setSendingReply(true);
+    setReplyError(null);
+    try {
+      await api.sendManualReply(eventId, selectedConv._id, text);
+      setReplyText("");
+      const msgs = await api.getMessages(eventId, selectedConv._id);
+      const list = msgs.data || [];
+      if (Array.isArray(list)) setMessages(list);
+    } catch (e: any) {
+      setReplyError(e?.message || "Could not send the reply");
+    } finally {
+      setSendingReply(false);
+    }
   };
 
   const filteredConvs = filter === "All" ? conversations : conversations.filter(c => c.status === filter);
@@ -182,14 +205,27 @@ export default function UnifiedInbox() {
             </div>
 
             <div className="p-4 bg-card/50 border-t border-border/50">
-              <input
-                type="text"
-                value={replyText}
-                onChange={e => setReplyText(e.target.value)}
-                placeholder="Manual replies are not enabled yet"
-                disabled
-                className="w-full bg-background border border-border/50 rounded-full pl-6 pr-12 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-sm opacity-60 cursor-not-allowed"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={replyText}
+                  onChange={e => setReplyText(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && sendReply()}
+                  placeholder="Type a manual reply… (sent through the connected channel bot)"
+                  disabled={sendingReply}
+                  className="flex-1 bg-background border border-border/50 rounded-full pl-6 pr-12 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-sm"
+                />
+                <button
+                  onClick={sendReply}
+                  disabled={sendingReply || !replyText.trim()}
+                  className="px-4 py-2 rounded-full bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm flex items-center gap-1.5 text-sm font-medium"
+                >
+                  {sendingReply ? <Bot className="w-4 h-4 animate-pulse" /> : <><Send className="w-4 h-4" /> Reply</>}
+                </button>
+              </div>
+              {replyError && (
+                <p className="text-[10px] text-red-400 mt-3 font-mono">{replyError}</p>
+              )}
               <p className="text-[10px] text-center text-muted-foreground mt-3 uppercase tracking-widest">
                 Automated AI replies are sent through connected channels
               </p>

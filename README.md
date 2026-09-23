@@ -70,12 +70,20 @@ The application is production-ready for live deployment. The frontend is a moder
 - AI Suggestions review (approve/reject AI-generated answers)
 - Omnichannel adapters for Discord, Slack, and Telegram
 - Security hardening: helmet, rate limiting, JWT auth, CORS lockdown, Sentry, graceful shutdown
+- Session security: short-lived access tokens (15 min, in-memory on the frontend) + refresh sessions stored hashed in Redis, rotated on every use with replay rejection, delivered via an httpOnly cookie; password change and logout revoke sessions; brute-force limiters on login/register/password
+- Live inbox: Server-Sent Events stream (`GET /api/events/:eventId/conversations/stream`) pushes new messages/conversations to the dashboard in real time
+- Manual (human) replies: `POST /api/events/:eventId/conversations/:id/reply` sends through the connected channel bot
+- Pagination on conversations and message endpoints (`?page=&limit=`, returns `{ data, total, page, totalPages }`)
+- AI console answers run through the **same LangGraph workflow** as the channel bots (moderation → supervisor → FAQ/analytics with RAG) — no more answer divergence between channels and the dashboard
+- Frontend observability: Sentry (client bootstrap + error boundaries on the root layout and dashboard)
 - Answer-threshold resolution (per-event `faqThreshold` → global settings → 0.85) honored by the LangGraph agent and conversation status
 - Vector-store reliability: single shared Qdrant wrapper, auto-created collection, deterministic point IDs, loud logging + Sentry capture on RAG failures, FAQ CRUD syncs to the vector store, `/health` reports vector-DB status
-- Tests: backend health, auth, invite, threshold & vector-store suites
+- Tests: backend health, auth, invite, session lifecycle (refresh rotation, logout, password change), threshold & vector-store suites
 
 **Known limitations / roadmap:**
-- Manual (human) replies inside the Inbox are not yet wired to a backend endpoint — messages flow through the connected channel bots automatically.
+- Web-widget chat manual replies: conversations from the built-in web widget have no persistent channel transport yet, so `reply` returns a clear 409 until a web transport is added — Discord/Slack/Telegram replies work now.
+- Cross-site refresh cookies (`SameSite=None; Secure`) work in Chrome/Firefox/Edge; Safari's ITP can block cross-site cookies, so users on Safari may need to sign in again after their refresh cookie expires.
+- No public read-only API keys / billing yet (post-launch SaaS roadmap).
 
 ---
 
@@ -259,7 +267,22 @@ GET    /api/unknown-questions # Get unknown questions
 
 ### **AI Agent**
 ```http
-POST   /api/ai/ask           # Ask the AI FAQ agent a question
+GET    /api/ai/ask?question=...&eventId=...   # Ask the AI agent (runs the same LangGraph pipeline as the bots)
+```
+
+### **Conversations (paginated)**
+```http
+GET    /api/events/:eventId/conversations?status=&page=&limit=  # List conversations
+GET    /api/events/:eventId/conversations/stream?token=         # SSE live stream (inbox)
+GET    /api/events/:eventId/conversations/:id/messages?page=&limit=  # Thread messages
+POST   /api/events/:eventId/conversations/:id/reply             # Manual (human) reply via channel bot
+```
+
+### **Session / Auth**
+```http
+POST   /api/auth/refresh     # Rotate refresh token (httpOnly cookie) -> new access token
+POST   /api/auth/logout      # Revoke refresh session + clear cookie
+PUT    /api/auth/password    # Change password (revokes all refresh sessions)
 ```
 
 ### **System**

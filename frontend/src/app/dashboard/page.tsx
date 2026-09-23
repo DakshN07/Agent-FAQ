@@ -4,9 +4,10 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Home, MessageSquare, Bot, Database, BarChart3, Shield, Settings, 
-  Sparkles, ShieldCheck, ChevronRight, Activity, Bell, Wifi, Radio, AlertTriangle
+  Sparkles, ShieldCheck, ChevronRight, Activity, Bell, Wifi, Radio, AlertTriangle, LogOut
 } from "lucide-react";
 import DashboardViews from "@/components/DashboardViews";
+import AppErrorBoundary from "@/components/AppErrorBoundary";
 import { api, getStoredActiveEventId, setStoredActiveEventId, getStoredUser } from "@/lib/api";
 
 export default function DashboardPage() {
@@ -17,6 +18,19 @@ export default function DashboardPage() {
   const [userInitial, setUserInitial] = useState("U");
   const [connectedChannels, setConnectedChannels] = useState<string[]>([]);
   const [alerts, setAlerts] = useState<string[]>([]);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await api.logout();
+    } finally {
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
+    }
+  };
 
   // Load user & events from API or localStorage
   useEffect(() => {
@@ -113,6 +127,14 @@ export default function DashboardPage() {
             <span>Channels: {connectedChannels.length > 0 ? connectedChannels.join(", ") : "None connected"}</span>
           </div>
           <div className="h-4 w-px bg-white/10" />
+          <button
+            onClick={handleLogout}
+            disabled={loggingOut}
+            title="Sign out"
+            className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-[10px] text-red-300 border border-white/5 hover:bg-red-500/20 hover:border-red-500/30 transition-colors cursor-pointer"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+          </button>
           <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center font-bold text-xs text-white border border-white/5">
             {userInitial}
           </div>
@@ -169,7 +191,9 @@ export default function DashboardPage() {
 
         {/* PANEL 2: CENTER WORKSPACE (Dynamic content) */}
         <div className="flex-1 glass border border-white/5 rounded-2xl overflow-hidden shadow-lg bg-[#0c0c0e]/40 relative">
-          <DashboardViews activeTab={activeTab} connectedChannels={connectedChannels} eventId={activeEventId} />
+          <AppErrorBoundary>
+            <DashboardViews activeTab={activeTab} connectedChannels={connectedChannels} eventId={activeEventId} />
+          </AppErrorBoundary>
         </div>
 
         {/* PANEL 3: RIGHT CONTEXT PANEL (System context) */}

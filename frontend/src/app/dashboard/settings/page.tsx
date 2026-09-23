@@ -17,6 +17,13 @@ export default function SettingsPage() {
   const [emailSaved, setEmailSaved] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
 
+  // Password change (Security tab)
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [savingPw, setSavingPw] = useState(false);
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [pwSuccess, setPwSuccess] = useState(false);
+
   useEffect(() => {
     // Prefer the user object the login/register flow stored; refresh from /me when possible.
     setUser(getStoredUser());
@@ -39,6 +46,23 @@ export default function SettingsPage() {
       setEmailError(err?.message || "Failed to save notification email");
     } finally {
       setSavingEmail(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwError(null);
+    setPwSuccess(false);
+    setSavingPw(true);
+    try {
+      await api.changePassword({ currentPassword, newPassword });
+      setCurrentPassword("");
+      setNewPassword("");
+      setPwSuccess(true);
+    } catch (err: any) {
+      setPwError(err?.message || "Failed to update password");
+    } finally {
+      setSavingPw(false);
     }
   };
 
@@ -169,26 +193,58 @@ export default function SettingsPage() {
           )}
 
           {activeTab === "Security" && (
-            <div className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-6">
+            <form onSubmit={handleChangePassword} className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-6">
               <h2 className="text-xl font-semibold text-white mb-6">Security Settings</h2>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-300">Password</label>
-                  <input type="password" readOnly value="••••••••" className="w-full rounded-md border border-white/10 bg-black/50 px-3 py-2 text-sm text-gray-400 cursor-not-allowed focus:outline-none" />
-                  <p className="text-xs text-gray-500">Password changes are not available in the dashboard yet.</p>
+                  <label className="text-sm font-medium text-gray-300">Current Password</label>
+                  <input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => { setCurrentPassword(e.target.value); setPwSuccess(false); }}
+                    placeholder="Your current password"
+                    className="w-full rounded-md border border-white/10 bg-black/50 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                  />
                 </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-300">New Password</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => { setNewPassword(e.target.value); setPwSuccess(false); }}
+                    placeholder="At least 8 characters"
+                    className="w-full rounded-md border border-white/10 bg-black/50 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Updates your password and signs you out of all other devices.
+                  </p>
+                </div>
+
+                {pwError && (
+                  <div className="flex items-center gap-2 p-3 text-xs bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{pwError}</span>
+                  </div>
+                )}
+                {pwSuccess && (
+                  <div className="flex items-center gap-2 p-3 text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg">
+                    <Check className="w-4 h-4 shrink-0" />
+                    <span>Password updated. Sign in again with the new password.</span>
+                  </div>
+                )}
+
                 <div className="pt-4 border-t border-white/10 mt-6 flex justify-end">
-                  <button 
-                    disabled
-                    title="Not available yet"
-                    className="bg-white/10 text-gray-400 px-4 py-2 rounded-lg font-medium cursor-not-allowed flex items-center gap-2"
+                  <button
+                    type="submit"
+                    disabled={savingPw || !currentPassword || newPassword.length < 8}
+                    className="bg-white text-black px-4 py-2 rounded-lg font-medium shadow-lg shadow-white/10 hover:bg-gray-100 transition-all flex items-center gap-2 disabled:opacity-50"
                   >
-                    <Shield className="w-4 h-4" />
-                    Update Password (soon)
+                    {savingPw ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
+                    Update Password
                   </button>
                 </div>
               </div>
-            </div>
+            </form>
           )}
 
           {activeTab === "API Keys" && (
