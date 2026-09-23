@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  MessageSquare, Clock, Send, MoreVertical, ShieldAlert,
-  Bot, User as UserIcon, CheckCircle2, Search, Filter
+import {
+  MessageSquare, Clock, MoreVertical,
+  Bot, User as UserIcon, CheckCircle2
 } from "lucide-react";
+import { api, getStoredActiveEventId } from "@/lib/api";
 
 export default function UnifiedInbox() {
   const [conversations, setConversations] = useState<any[]>([]);
@@ -13,26 +14,41 @@ export default function UnifiedInbox() {
   const [messages, setMessages] = useState<any[]>([]);
   const [replyText, setReplyText] = useState("");
   const [filter, setFilter] = useState("All");
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const eventId = "PLACEHOLDER_EVENT_ID"; // Get from context
+  const eventId = getStoredActiveEventId() || "";
 
   useEffect(() => {
-    // Mock data for UI demonstration since backend DB might be empty initially
-    const mockConvs = [
-      { _id: '1', platform: 'discord', status: 'Escalated', lastMessageAt: new Date().toISOString(), userId: { username: 'AlexD' }, text: 'I am getting a billing error.' },
-      { _id: '2', platform: 'telegram', status: 'Answered', lastMessageAt: new Date(Date.now() - 3600000).toISOString(), userId: { username: 'CryptoFan' }, text: 'When is the next drop?' },
-      { _id: '3', platform: 'slack', status: 'Pending', lastMessageAt: new Date(Date.now() - 7200000).toISOString(), userId: { username: 'Sarah Team' }, text: 'How do I invite members?' },
-    ];
-    setConversations(mockConvs);
-  }, []);
+    if (!eventId) {
+      setLoading(false);
+      setLoadError("No event selected. Create or select an event to view its inbox.");
+      return;
+    }
+    let cancelled = false;
+    api.getConversations(eventId)
+      .then((convs) => {
+        if (cancelled) return;
+        if (Array.isArray(convs)) setConversations(convs);
+      })
+      .catch((e: any) => {
+        if (!cancelled) setLoadError(e?.message || "Could not load conversations");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [eventId]);
 
   const handleSelectConv = (conv: any) => {
     setSelectedConv(conv);
-    // Mock messages
-    setMessages([
-      { id: 'm1', senderType: 'User', text: conv.text, createdAt: conv.lastMessageAt },
-      ...(conv.status === 'Answered' ? [{ id: 'm2', senderType: 'Agent', text: 'The next drop is on Friday at 5 PM UTC!', createdAt: new Date().toISOString(), confidence: 0.95 }] : [])
-    ]);
+    setMessages([]);
+    if (!eventId || !conv?._id) return;
+    api.getMessages(eventId, conv._id)
+      .then((msgs) => {
+        if (Array.isArray(msgs)) setMessages(msgs);
+      })
+      .catch(() => {});
   };
 
   const filteredConvs = filter === "All" ? conversations : conversations.filter(c => c.status === filter);
@@ -62,6 +78,15 @@ export default function UnifiedInbox() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-2 smooth-scroll">
+          {loading ? (
+            <div className="text-center py-10 text-xs text-muted-foreground">Loading conversations…</div>
+          ) : loadError ? (
+            <div className="text-center py-10 text-xs text-red-400 px-3">{loadError}</div>
+          ) : filteredConvs.length === 0 ? (
+            <div className="text-center py-10 text-xs text-muted-foreground px-3">
+              No conversations yet. Messages from connected channels will appear here.
+            </div>
+          ) : (
           <AnimatePresence>
             {filteredConvs.map((conv, i) => (
               <motion.button
@@ -75,22 +100,23 @@ export default function UnifiedInbox() {
                 className={`w-full text-left p-4 rounded-xl transition-all duration-300 ${selectedConv?._id === conv._id ? 'bg-accent text-accent-foreground ring-1 ring-border/50 shadow-sm' : 'hover:bg-muted/30'}`}
               >
                 <div className="flex justify-between items-center mb-2">
-                  <span className="font-semibold text-sm truncate pr-2">{conv.userId?.username || 'Anonymous'}</span>
+                  <span className="font-semibold text-sm truncate pr-2">{conv.userId?.username || conv.senderName || 'Anonymous'}</span>
                   <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{conv.platform}</span>
                 </div>
-                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed mb-3">{conv.text}</p>
+                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed mb-3">{conv.lastMessage?.text || conv.text || 'Conversation'}</p>
                 <div className="flex justify-between items-center">
                   <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${conv.status === 'Answered' ? 'bg-emerald-500/10 text-emerald-500' : conv.status === 'Escalated' ? 'bg-amber-500/10 text-amber-500' : 'bg-blue-500/10 text-blue-500'}`}>
-                    {conv.status}
+                    {conv.status || 'Pending'}
                   </span>
                   <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                     <Clock className="w-3 h-3" />
-                    {new Date(conv.lastMessageAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    {conv.lastMessageAt ? new Date(conv.lastMessageAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '—'}
                   </span>
                 </div>
               </motion.button>
             ))}
           </AnimatePresence>
+          )}
         </div>
       </motion.div>
 
@@ -118,51 +144,54 @@ export default function UnifiedInbox() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-6 smooth-scroll">
-              <AnimatePresence>
-                {messages.map((msg, i) => (
-                  <motion.div 
-                    key={msg.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`flex ${msg.senderType === 'User' ? 'justify-start' : 'justify-end'}`}
-                  >
-                    <div className={`max-w-[80%] flex flex-col ${msg.senderType === 'User' ? 'items-start' : 'items-end'}`}>
-                      <div className={`flex items-center gap-2 mb-1 px-1 ${msg.senderType === 'User' ? 'flex-row' : 'flex-row-reverse'}`}>
-                        {msg.senderType === 'Agent' ? <Bot className="w-3 h-3 text-purple-500" /> : <UserIcon className="w-3 h-3 text-muted-foreground" />}
-                        <span className="text-[10px] text-muted-foreground uppercase font-medium tracking-wider">
-                          {msg.senderType}
-                        </span>
-                      </div>
-                      <div className={`p-4 rounded-2xl text-sm leading-relaxed ${msg.senderType === 'User' ? 'bg-muted/50 rounded-tl-sm' : 'bg-primary text-primary-foreground shadow-md rounded-tr-sm'}`}>
-                        {msg.text}
-                      </div>
-                      {msg.confidence && (
-                        <div className="mt-1 px-1 text-[10px] text-emerald-500 flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" />
-                          {(msg.confidence * 100).toFixed(0)}% AI Confidence
+              {messages.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center opacity-60">
+                  <MessageSquare className="w-12 h-12 mb-3 stroke-[1.5] text-muted-foreground" />
+                  <p className="text-sm font-medium text-muted-foreground">No messages in this conversation</p>
+                </div>
+              ) : (
+                <AnimatePresence>
+                  {messages.map((msg, i) => (
+                    <motion.div
+                      key={msg._id || msg.id || i}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`flex ${msg.senderType === 'User' ? 'justify-start' : 'justify-end'}`}
+                    >
+                      <div className={`max-w-[80%] flex flex-col ${msg.senderType === 'User' ? 'items-start' : 'items-end'}`}>
+                        <div className={`flex items-center gap-2 mb-1 px-1 ${msg.senderType === 'User' ? 'flex-row' : 'flex-row-reverse'}`}>
+                          {msg.senderType === 'Agent' ? <Bot className="w-3 h-3 text-purple-500" /> : <UserIcon className="w-3 h-3 text-muted-foreground" />}
+                          <span className="text-[10px] text-muted-foreground uppercase font-medium tracking-wider">
+                            {msg.senderType}
+                          </span>
                         </div>
-                      )}
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
+                        <div className={`p-4 rounded-2xl text-sm leading-relaxed ${msg.senderType === 'User' ? 'bg-muted/50 rounded-tl-sm' : 'bg-primary text-primary-foreground shadow-md rounded-tr-sm'}`}>
+                          {msg.text}
+                        </div>
+                        {msg.confidence != null && msg.confidence > 0 && (
+                          <div className="mt-1 px-1 text-[10px] text-emerald-500 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" />
+                            {(msg.confidence * 100).toFixed(0)}% AI Confidence
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              )}
             </div>
 
             <div className="p-4 bg-card/50 border-t border-border/50">
-              <div className="relative flex items-center">
-                <input 
-                  type="text" 
-                  value={replyText}
-                  onChange={e => setReplyText(e.target.value)}
-                  placeholder="Type a reply to send..." 
-                  className="w-full bg-background border border-border/50 rounded-full pl-6 pr-12 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-sm"
-                />
-                <button className="absolute right-2 p-2 bg-primary text-primary-foreground rounded-full hover:scale-105 transition-transform shadow-md">
-                  <Send className="w-4 h-4" />
-                </button>
-              </div>
+              <input
+                type="text"
+                value={replyText}
+                onChange={e => setReplyText(e.target.value)}
+                placeholder="Manual replies are not enabled yet"
+                disabled
+                className="w-full bg-background border border-border/50 rounded-full pl-6 pr-12 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-sm opacity-60 cursor-not-allowed"
+              />
               <p className="text-[10px] text-center text-muted-foreground mt-3 uppercase tracking-widest">
-                Replying will train the AI automatically
+                Automated AI replies are sent through connected channels
               </p>
             </div>
           </>

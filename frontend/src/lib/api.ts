@@ -115,6 +115,16 @@ export const api = {
     return data;
   },
 
+  async acceptInvite(inviteData: { token: string; name: string; password: string }) {
+    const data = await apiRequest<{ token: string; user: any }>('/api/auth/accept-invite', {
+      method: 'POST',
+      body: JSON.stringify(inviteData),
+    });
+    if (data.token) setToken(data.token);
+    if (data.user) setStoredUser(data.user);
+    return data;
+  },
+
   async getMe() {
     const data = await apiRequest<{ user: any }>('/api/auth/me');
     if (data.user) setStoredUser(data.user);
@@ -225,8 +235,8 @@ export const api = {
     return apiRequest<any[]>(`/api/events/${eventId}/conversations${query}`);
   },
 
-  async getMessages(conversationId: string) {
-    return apiRequest<any[]>(`/api/conversations/${conversationId}/messages`);
+  async getMessages(eventId: string, conversationId: string) {
+    return apiRequest<any[]>(`/api/events/${eventId}/conversations/${conversationId}/messages`);
   },
 
   // Integrations

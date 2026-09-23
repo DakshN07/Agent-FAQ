@@ -5,7 +5,11 @@ const crypto = require('crypto');
 const Integration = require('../models/Integration');
 const Event = require('../models/Event');
 
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+// Helper to build the OAuth redirect URL from the incoming request, so it
+// always points back at the backend regardless of environment.
+const backendOrigin = (req) => `${req.protocol}://${req.get('host')}`;
 
 // Helper to save integration securely mapped to event
 const saveIntegration = async (eventId, platform, credentials) => {
@@ -33,7 +37,7 @@ const saveIntegration = async (eventId, platform, credentials) => {
 // Forwarder to Slack Authorization Page
 router.get('/slack', (req, res) => {
     const { state } = req.query; // eventId
-    const redirectUri = `${process.env.VITE_API_URL || 'http://localhost:3000'}/api/oauth/slack/callback`;
+    const redirectUri = `${backendOrigin(req)}/api/oauth/slack/callback`;
     const url = `https://slack.com/oauth/v2/authorize?client_id=${process.env.SLACK_CLIENT_ID}&scope=chat:write,chat:write.public&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
     res.redirect(url);
 });
@@ -71,7 +75,7 @@ router.get('/slack/callback', async (req, res) => {
 // Forwarder to Discord Authorization Page
 router.get('/discord', (req, res) => {
     const { state } = req.query; // eventId
-    const redirectUri = `${process.env.VITE_API_URL || 'http://localhost:3000'}/api/oauth/discord/callback`;
+    const redirectUri = `${backendOrigin(req)}/api/oauth/discord/callback`;
     const url = `https://discord.com/oauth2/authorize?client_id=${process.env.DISCORD_CLIENT_ID}&permissions=8&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&integration_type=0&scope=bot&state=${state}`;
     res.redirect(url);
 });
@@ -90,7 +94,7 @@ router.get('/discord/callback', async (req, res) => {
         params.append('grant_type', 'authorization_code');
         params.append('code', code);
         // Ensure redirect_uri accurately matches what you entered in Discord Dev Portal
-        params.append('redirect_uri', `${process.env.VITE_API_URL || 'http://localhost:3000'}/api/oauth/discord/callback`);
+        params.append('redirect_uri', `${backendOrigin(req)}/api/oauth/discord/callback`);
 
         const response = await axios.post('https://discord.com/api/oauth2/token', params, {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' }

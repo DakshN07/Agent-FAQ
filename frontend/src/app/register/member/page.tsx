@@ -1,28 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Sparkles, Hash, ArrowRight, Lock, Mail } from "lucide-react";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Sparkles, Mail, ArrowRight } from "lucide-react";
 
 export default function RegisterMemberPage() {
-  const [inviteCode, setInviteCode] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const router = useRouter();
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    // Simulate API call and save user details
-    const name = email.split('@')[0] || "Member";
-    localStorage.setItem('user', JSON.stringify({ 
-      name: name, 
-      email: email, 
-      plan: 'Team Member'
-    }));
-    router.push("/dashboard/events");
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-black text-white relative overflow-hidden">
       {/* Background Gradients */}
@@ -32,73 +13,42 @@ export default function RegisterMemberPage() {
       <div className="w-full max-w-md p-8 relative z-10">
         <div className="flex flex-col items-center mb-10">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg shadow-blue-500/20 mb-4">
-            <Sparkles className="h-6 w-6 text-white" />
+            <Mail className="h-6 w-6 text-white" />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-center">Join Organization</h1>
-          <p className="text-gray-400 mt-2 text-center text-sm">
-            Enter your invite code to join as a member.
+          <h1 className="text-3xl font-bold tracking-tight text-center">You were invited to a team</h1>
+          <p className="text-gray-400 mt-2 text-center text-sm max-w-sm">
+            Team members join an organization through a secure invite link sent to their email. If you received
+            an invitation email, open the link it contains to create your account and join.
           </p>
         </div>
 
-        <div className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-8 space-y-6">
-          <form className="space-y-4" onSubmit={handleRegister}>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-200">Invite Code</label>
-              <div className="relative">
-                <input 
-                  className="flex h-10 w-full rounded-md border border-white/10 bg-black/50 px-3 py-2 pl-10 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                  placeholder="e.g. A1B2C3D4" 
-                  value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value)}
-                  required 
-                />
-                <Hash className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-200">Email Address</label>
-              <div className="relative">
-                <input 
-                  className="flex h-10 w-full rounded-md border border-white/10 bg-black/50 px-3 py-2 pl-10 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                  placeholder="member@company.com" 
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required 
-                />
-                <Mail className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-200">Password</label>
-              <div className="relative">
-                <input 
-                  className="flex h-10 w-full rounded-md border border-white/10 bg-black/50 px-3 py-2 pl-10 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                  placeholder="••••••••" 
-                  type="password" 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required 
-                />
-                <Lock className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
-              </div>
-            </div>
-
-            <button type="submit" className="flex items-center justify-center w-full rounded-md bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all mt-6 group">
-              Join Organization
-              <ArrowRight className="ml-2 h-4 w-4 transform group-hover:translate-x-1 transition-transform" />
-            </button>
-          </form>
+        <div className="flex flex-col gap-3">
+          <Link
+            href="/invite"
+            className="flex items-center justify-center gap-2 w-full rounded-md bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all group"
+          >
+            Continue with my invite link
+            <ArrowRight className="ml-1 h-4 w-4 transform group-hover:translate-x-1 transition-transform" />
+          </Link>
+          <Link
+            href="/login"
+            className="flex items-center justify-center w-full rounded-md border border-white/10 px-4 py-2.5 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/5 transition-all"
+          >
+            I already have an account — Sign In
+          </Link>
         </div>
 
-        <p className="text-center text-sm text-gray-400 mt-8">
-          Already have an account?{" "}
-          <Link href="/login" className="text-white font-medium hover:underline">
-            Sign In
+        <p className="text-center text-sm text-gray-500 mt-8">
+          Want to create an organization instead?{" "}
+          <Link href="/register/org" className="text-white font-medium hover:underline">
+            Register an organization
           </Link>
         </p>
+
+        <div className="mt-8 flex items-center justify-center gap-2 text-xs text-gray-600">
+          <Sparkles className="w-3.5 h-3.5" />
+          Invite codes are issued by your organization&apos;s admin.
+        </div>
       </div>
     </div>
   );

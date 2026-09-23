@@ -28,12 +28,32 @@ services:
         sync: false
       - key: SENTRY_DSN
         sync: false
-      # --- Optional integrations ---
+      # --- Optional AI providers ---
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      # --- Channel integrations ---
       - key: DISCORD_TOKEN
+        sync: false
+      - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: DISCORD_CLIENT_SECRET
         sync: false
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: SLACK_CLIENT_ID
         sync: false
       - key: SLACK_CLIENT_SECRET
+        sync: false
+      # --- Email (team invites) ---
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
         sync: false

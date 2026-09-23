@@ -1,18 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Users, UserPlus, Mail, Shield, MoreVertical, Trash2, Edit, X, Loader2 } from "lucide-react";
+import { Users, UserPlus, Mail, Shield, MoreVertical, Trash2, Edit, X, Loader2, AlertCircle } from "lucide-react";
 import { api, getStoredActiveEventId } from "@/lib/api";
 
-const mockMembers = [
-  { _id: '1', email: "alice@acme.com", userId: { username: "Alice Admin" }, role: "admin", status: "Active" },
-  { _id: '2', email: "bob@acme.com", userId: { username: "Bob Builder" }, role: "agent", status: "Active" },
-  { _id: '3', email: "charlie@acme.com", userId: null, role: "agent", status: "Pending" },
-  { _id: '4', email: "dave@acme.com", userId: { username: "Dave" }, role: "agent", status: "Removed" },
-];
-
 export default function TeamPage() {
-  const [teamMembers, setTeamMembers] = useState<any[]>(mockMembers);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
@@ -20,32 +16,42 @@ export default function TeamPage() {
   const [inviteRole, setInviteRole] = useState("agent");
   const [isInviting, setIsInviting] = useState(false);
 
-  const eventId = getStoredActiveEventId() || "default_event";
+  const eventId = getStoredActiveEventId() || "";
 
   useEffect(() => {
-    async function loadMembers() {
-      try {
-        const members = await api.getTeamMembers(eventId);
-        if (Array.isArray(members) && members.length > 0) {
-          setTeamMembers(members);
-        }
-      } catch (e) {}
+    if (!eventId) {
+      setLoading(false);
+      setLoadError("No event selected. Create or select an event to manage its team.");
+      return;
     }
-    loadMembers();
+    let cancelled = false;
+    api.getTeamMembers(eventId)
+      .then((members) => {
+        if (!cancelled && Array.isArray(members)) setTeamMembers(members);
+      })
+      .catch((e: any) => {
+        if (!cancelled) setLoadError(e?.message || "Could not load team members");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
   }, [eventId]);
 
   const removeMember = async (id: string) => {
     try {
       await api.removeTeamMember(eventId, id);
-    } catch (e) {}
-    setTeamMembers(teamMembers.map(m => m._id === id ? { ...m, status: "Removed" } : m));
+      setTeamMembers(teamMembers.filter(m => m._id !== id));
+    } catch (e: any) {
+      setLoadError(e?.message || "Failed to remove member");
+    }
     setOpenMenuId(null);
   };
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inviteEmail) return;
-    
+    setInviteError(null);
     setIsInviting(true);
     
     try {
@@ -54,25 +60,14 @@ export default function TeamPage() {
         role: inviteRole,
         platformAccess: ['discord', 'slack', 'telegram']
       });
-      setTeamMembers([...teamMembers, newMember || { 
-        _id: Date.now().toString(), 
-        email: inviteEmail, 
-        userId: null,
-        role: inviteRole, 
-        status: "Pending" 
-      }]);
-    } catch (err) {
-      setTeamMembers([...teamMembers, { 
-        _id: Date.now().toString(), 
-        email: inviteEmail, 
-        userId: null,
-        role: inviteRole, 
-        status: "Pending" 
-      }]);
-    } finally {
-      setIsInviting(false);
+      if (newMember) setTeamMembers([...teamMembers, newMember]);
       setIsInviteModalOpen(false);
       setInviteEmail("");
+    } catch (err: any) {
+      // Never fake a successful invite — surface the real error.
+      setInviteError(err?.message || "Invite failed. Please try again.");
+    } finally {
+      setIsInviting(false);
     }
   };
 
@@ -98,7 +93,18 @@ export default function TeamPage() {
           <h2 className="font-semibold text-lg text-white">Active Members</h2>
         </div>
         
-        {teamMembers.length === 0 ? (
+        {loadError ? (
+          <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
+            <AlertCircle className="w-8 h-8 text-red-400 mb-3" />
+            <h3 className="text-xl font-medium text-white mb-2">Could not load members</h3>
+            <p className="text-gray-400 max-w-sm">{loadError}</p>
+          </div>
+        ) : loading ? (
+          <div className="flex-1 flex items-center justify-center p-12 text-center">
+            <Loader2 className="w-6 h-6 text-purple-400 animate-spin" />
+            <p className="text-gray-400 ml-3">Loading team members…</p>
+          </div>
+        ) : teamMembers.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
             <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4 border border-white/10">
               <Users className="w-8 h-8 text-gray-500" />
@@ -171,9 +177,13 @@ export default function TeamPage() {
                             onClick={() => setOpenMenuId(null)}
                           />
                           <div className="absolute right-6 top-10 w-48 bg-[#131825] border border-white/10 rounded-lg shadow-xl z-20 py-1 flex flex-col text-left">
-                            <button className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors w-full text-left">
+                            <button
+                              disabled
+                              title="Role changes are not supported yet"
+                              className="flex items-center gap-2 px-4 py-2 text-sm text-gray-500 cursor-not-allowed w-full text-left"
+                            >
                               <Edit className="w-4 h-4" />
-                              Change Role
+                              Change Role (soon)
                             </button>
                             {member.status !== 'Removed' && (
                               <button 
@@ -211,6 +221,12 @@ export default function TeamPage() {
             </div>
             
             <form onSubmit={handleInvite} className="p-6 space-y-5">
+              {inviteError && (
+                <div className="flex items-center gap-2 p-3 text-xs bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{inviteError}</span>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1.5">Email Address</label>
                 <input 

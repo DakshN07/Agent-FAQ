@@ -57,24 +57,23 @@
 
 ---
 
-## 🚧 Current Status & Remaining Work
+## 🚧 Current Status
 
-The project is currently undergoing a frontend migration from a legacy Vite/React application (`frontend-old`) to a modern Next.js (App Router) application (`frontend`).
+The application is production-ready for live deployment. The frontend is a modern Next.js (App Router) application (`frontend`), backed by the Node.js/Express API (`server.js`).
 
-**Implemented in New Next.js Frontend:**
-- Authentication (Login / Register)
-- Dashboard Layout & Routing
-- Inbox View
-- Events View
-- Integrations View
+**Implemented Features:**
+- Authentication (Login / Register / Team Invitations)
+- Dashboard with Overview, Inbox, AI Agent console, Knowledge (FAQ) management
+- Events, Integrations, Team, and Moderation views
+- Analytics dashboard (query volume, resolution rates, platform distribution)
+- Settings configuration (similarity threshold, auto-response, notifications)
+- AI Suggestions review (approve/reject AI-generated answers)
+- Omnichannel adapters for Discord, Slack, and Telegram
+- Security hardening: helmet, rate limiting, JWT auth, CORS lockdown, Sentry, graceful shutdown
+- Tests: backend health & auth suites
 
-**Remaining Functionality to Migrate (Pending):**
-- **FAQ Management**: Interface to Add, Edit, and Delete FAQs
-- **Analytics Dashboard**: Real-time statistics, charts, and activity tracking
-- **Settings Configuration**: App-wide similarity threshold and auto-response settings
-- **User/Team Management**: Role-based access and team invitations
-- **Profile Management**: User profile settings
-- **AI Suggestions View**: Reviewing and approving AI-generated answers for unknown questions
+**Known limitations / roadmap:**
+- Manual (human) replies inside the Inbox are not yet wired to a backend endpoint — messages flow through the connected channel bots automatically.
 
 ---
 
@@ -111,14 +110,13 @@ The project is currently undergoing a frontend migration from a legacy Vite/Reac
 ```text
 Agent-FAQ/
 ├── 📁 adapters/               # Integration adapters (Discord, Slack, Telegram)
-├── 📁 backend/                # Core AI logic (embedding, similarity)
 ├── 📁 config/                 # Environment and app configuration
 ├── 📁 frontend/               # Next.js frontend application (Active)
-├── 📁 frontend-old/           # Vite React frontend (Legacy)
 ├── 📁 models/                 # Database models (Mongoose)
 ├── 📁 routes/                 # Express API routes
-├── 📁 services/               # Core business logic (IntegrationManager)
+├── 📁 services/               # Core business logic (IntegrationManager, AI)
 ├── 📁 middleware/             # Express middlewares (auth, error handling)
+├── 📁 validations/            # Request validation schemas (Joi)
 ├── 📁 utils/                  # Utility functions (logger, email)
 ├── server.js                  # Main Express server file
 ├── package.json               # Backend dependencies
@@ -175,9 +173,21 @@ MONGO_URI=your_mongodb_atlas_connection_string
 # Authentication
 JWT_SECRET=your_super_secret_jwt_key
 
-# AI Services
+# AI Services (MISTRAL_API_KEY is required for boot)
+MISTRAL_API_KEY=your_mistral_api_key
+
+# Optional AI providers
 GEMINI_API_KEY=your_gemini_api_key
 OPENAI_API_KEY=your_openai_api_key
+
+# Redis (optional, for rate-limit stores)
+REDIS_URL=
+
+# CORS origins (comma-separated, required in production)
+CORS_ORIGINS=
+
+# Frontend base URL (for invite links and emails)
+FRONTEND_URL=http://localhost:3000
 
 # Discord Bot (optional)
 DISCORD_TOKEN=your_discord_bot_token
@@ -188,6 +198,11 @@ SMTP_PORT=587
 SMTP_USER=your_email@gmail.com
 SMTP_PASS=your_app_password
 SMTP_FROM=your_email@gmail.com
+```
+
+Then create a `.env.local` in `frontend/`:
+```env
+NEXT_PUBLIC_API_URL=http://localhost:3000
 ```
 
 ### **4. Run Locally**
@@ -201,8 +216,8 @@ npm run dev
 ```
 
 ### **5. Access the Application**
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:3000
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:3000/api
 
 ---
 
@@ -210,11 +225,20 @@ npm run dev
 
 ### **Authentication**
 ```http
-POST /api/login              # User login
-POST /api/accept-invite      # Accept team invitation
+POST /api/auth/register        # Register a new admin user
+POST /api/auth/login           # User login
+POST /api/auth/accept-invite   # Accept team invitation
+GET  /api/auth/me              # Get current user
 ```
 
-### **FAQ Management**
+### **Events**
+```http
+GET    /api/events             # List events for current user
+POST   /api/events             # Create an event
+POST   /api/events/join        # Join an event via invite code
+```
+
+### **FAQ Management** (`/api/events/:eventId/faqs`)
 ```http
 GET    /api/faqs             # Get all FAQs
 POST   /api/faqs             # Create new FAQ
@@ -228,12 +252,19 @@ GET    /api/analytics        # Get analytics data
 GET    /api/settings         # Get app settings
 PUT    /api/settings         # Update settings
 GET    /api/suggestions      # Get AI suggestions
+GET    /api/unknown-questions # Get unknown questions
+```
+
+### **AI Agent**
+```http
+POST   /api/ai/ask           # Ask the AI FAQ agent a question
 ```
 
 ### **System**
 ```http
-GET    /api/health           # Health check
-GET    /api/unknown-questions # Get unknown questions
+GET    /health               # Health check
+GET    /api/health           # API health check
+GET    /api-docs             # Swagger API docs (disabled in production)
 ```
 
 ---
@@ -288,13 +319,18 @@ GET    /api/unknown-questions # Get unknown questions
 2. **Import Repository**
    - Select your `Agent-FAQ` repository
    - Set root directory to `frontend/`
-   - Vercel auto-detects React + Vite
+   - Vercel auto-detects the Next.js framework (see `frontend/vercel.json`)
 
-3. **Deploy**
+3. **Configure Environment Variables**
+   - Set `NEXT_PUBLIC_API_URL` to your deployed backend URL (e.g. `https://agent-faq.onrender.com`)
+
+4. **Deploy**
    - Click "Deploy"
    - Get your live URL
 
 ### **Backend Deployment (Render)**
+
+A `render.yaml` blueprint is included. Alternatively:
 
 1. **Create Web Service**
    - Go to [render.com](https://render.com)
@@ -309,9 +345,14 @@ GET    /api/unknown-questions # Get unknown questions
 
 3. **Environment Variables**
    ```env
+   # Required
+   NODE_ENV=production
    MONGO_URI=your_mongodb_atlas_connection
-   JWT_SECRET=your_jwt_secret
-   GEMINI_API_KEY=your_gemini_key
+   JWT_SECRET=your_strong_random_secret
+   MISTRAL_API_KEY=your_mistral_key
+   # Recommended
+   CORS_ORIGINS=https://your-frontend.vercel.app
+   FRONTEND_URL=https://your-frontend.vercel.app
    ```
 
 4. **Deploy**
@@ -341,20 +382,13 @@ GET    /api/unknown-questions # Get unknown questions
 ##  Configuration
 
 ### **CORS Setup**
-If you get CORS errors, update your backend:
-```javascript
-app.use(cors({
-  origin: ['https://your-frontend.vercel.app', 'http://localhost:5173'],
-  credentials: true
-}));
+In production the backend only allows origins listed in `CORS_ORIGINS` (comma-separated). Set it to your frontend URL:
+```env
+CORS_ORIGINS=https://your-frontend.vercel.app
 ```
 
 ### **Environment Variables**
-Make sure all required environment variables are set in Render:
-- `MONGO_URI` - MongoDB Atlas connection string
-- `JWT_SECRET` - Secret key for JWT tokens
-- `GEMINI_API_KEY` - Google Gemini API key
-- `DISCORD_TOKEN` - Discord bot token (optional)
+All required environment variables are validated at boot by `config/env.js`. The service will refuse to start if `MONGO_URI`, `JWT_SECRET`, or `MISTRAL_API_KEY` are missing, or if `JWT_SECRET` uses the insecure default placeholder in production.
 
 ---
 

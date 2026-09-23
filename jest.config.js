@@ -1,8 +1,8 @@
 module.exports = {
   testEnvironment: 'node',
   testMatch: ['**/tests/**/*.test.js'],
-  testPathIgnorePatterns: ['/node_modules/', '/.kilo/', '/frontend/', '/frontend-old/'],
-  modulePathIgnorePatterns: ['<rootDir>/.kilo/', '<rootDir>/frontend-old/'],
+  testPathIgnorePatterns: ['/node_modules/', '/.kilo/', '/frontend/'],
+  modulePathIgnorePatterns: ['<rootDir>/.kilo/', '<rootDir>/frontend/'],
   collectCoverageFrom: [
     'routes/**/*.js',
     'middleware/**/*.js',

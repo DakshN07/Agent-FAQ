@@ -22,10 +22,8 @@ export default function LoginPage() {
       await api.login({ email, password });
       router.push("/dashboard");
     } catch (err: any) {
-      // Fallback for local demo if backend is offline
-      const name = email.split('@')[0] || "User";
-      localStorage.setItem('agent_faq_user', JSON.stringify({ username: name, email, role: 'admin' }));
-      router.push("/dashboard");
+      // Never grant access without a valid backend authentication.
+      setError(err?.message || "Login failed. Please check your credentials and try again.");
     } finally {
       setIsLoading(false);
     }

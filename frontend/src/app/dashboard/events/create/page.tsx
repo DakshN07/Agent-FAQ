@@ -1,14 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles, Calendar, Clock, MapPin, Tag, Gift, Type, Loader2 } from "lucide-react";
+import { Sparkles, Calendar, Clock, MapPin, Tag, Gift, Type, Loader2, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { api, setStoredActiveEventId } from "@/lib/api";
+import { api, setStoredActiveEventId, getStoredUser } from "@/lib/api";
 
 export default function CreateEventPage() {
-  const [prompt, setPrompt] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [eventData, setEventData] = useState({
     name: "",
     date: "",
@@ -20,47 +19,35 @@ export default function CreateEventPage() {
   });
   const router = useRouter();
 
-  const handleGenerate = async () => {
-    if (!prompt) return;
-    setIsGenerating(true);
-    
-    try {
-      // AI generation simulation or fallback
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setEventData({
-        name: "ETH Global Hackathon",
-        date: "2026-10-24",
-        time: "09:00 AM",
-        venue: "KTPO Convention Centre, Bengaluru",
-        event_type: "Hackathon",
-        description: prompt.length > 20 ? prompt : "The largest Ethereum hackathon in India. Build the future of Web3 with top developers worldwide.",
-        goodies: "T-shirts, hoodies, exclusive NFT badges"
-      });
-    } catch (error) {
-      console.error("Failed to generate event", error);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaveError(null);
     setIsSaving(true);
     try {
       const res = await api.createEvent({
         name: eventData.name,
         description: eventData.description,
-        details: eventData
+        // Ask the backend to enrich the description from the extra details.
+        useAIIntro: true,
+        details: {
+          date: eventData.date,
+          time: eventData.time,
+          venue: eventData.venue,
+          event_type: eventData.event_type,
+          goodies: eventData.goodies,
+          contactNumber: getStoredUser()?.phoneNumber || "",
+        },
       });
       if (res?.event?._id) {
         setStoredActiveEventId(res.event._id);
+        router.push("/dashboard");
+      } else {
+        setSaveError("Event was created but no ID was returned. Please check your event list.");
       }
-    } catch (e) {
-      // Fallback
+    } catch (err: any) {
+      setSaveError(err?.message || "Failed to save event. Please try again.");
     } finally {
       setIsSaving(false);
-      router.push("/dashboard");
     }
   };
 
@@ -72,35 +59,20 @@ export default function CreateEventPage() {
     <div className="p-8 max-w-4xl mx-auto text-white">
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-500">
-          Create Event with AI
+          Create Event
         </h1>
         <p className="text-gray-400 mt-2">
-          Describe your event naturally and let our AI fill out the details.
+          Set up an event context. The AI assistant auto-generates a starter FAQ set after you save
+          (using Mistral/Gemini when configured).
         </p>
       </div>
 
-      {/* AI Prompt Section */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-6 mb-8 backdrop-blur-md">
-        <label className="block text-sm font-medium text-gray-300 mb-2">
-          Describe your event (The "Bestest" Way)
-        </label>
-        <div className="relative">
-          <textarea
-            className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-white placeholder:text-gray-500 focus:ring-2 focus:ring-purple-500/50 focus:outline-none min-h-[120px] resize-y"
-            placeholder="e.g. Create an ETH Global hackathon in India next month. Venue is KTPO Bengaluru. Give out t-shirts and hoodies as goodies."
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-          />
-          <button
-            onClick={handleGenerate}
-            disabled={isGenerating || !prompt}
-            className="absolute bottom-4 right-4 flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-2 rounded-lg font-medium shadow-lg hover:shadow-purple-500/25 disabled:opacity-50 transition-all"
-          >
-            {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            {isGenerating ? "Generating..." : "Generate Magic"}
-          </button>
+      {saveError && (
+        <div className="mb-6 flex items-center gap-2 p-3 text-xs bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>{saveError}</span>
         </div>
-      </div>
+      )}
 
       {/* Event Form Section */}
       <form onSubmit={handleSave} className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-md space-y-6">
@@ -173,12 +145,17 @@ export default function CreateEventPage() {
             </label>
             <textarea 
               name="description" value={eventData.description} onChange={handleChange}
+              placeholder="Optional — if left empty, the AI will generate a description from the details above."
               className="w-full bg-black/50 border border-white/10 rounded-md p-2.5 text-white focus:ring-2 focus:ring-purple-500/50 outline-none min-h-[100px]"
             />
           </div>
         </div>
 
-        <div className="flex justify-end pt-4">
+        <div className="flex items-center justify-end gap-3 pt-4">
+          <span className="text-[11px] text-gray-500 flex items-center gap-1.5 mr-auto">
+            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+            Starter FAQs are generated automatically on save.
+          </span>
           <button 
             type="submit" 
             disabled={isSaving}

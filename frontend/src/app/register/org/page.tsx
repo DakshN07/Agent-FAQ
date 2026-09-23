@@ -38,15 +38,8 @@ export default function RegisterOrgPage() {
       localStorage.setItem('onboarding_orgName', orgName);
       router.push("/dashboard");
     } catch (err: any) {
-      // Fallback for local testing
-      localStorage.setItem('agent_faq_user', JSON.stringify({ 
-        username: adminName, 
-        org: orgName, 
-        email: email, 
-        role: 'admin'
-      }));
-      localStorage.setItem('onboarding_orgName', orgName);
-      router.push("/dashboard");
+      // Never fake a successful registration — surface the real error.
+      setError(err?.message || "Registration failed. Please try again.");
     } finally {
       setIsLoading(false);
     }

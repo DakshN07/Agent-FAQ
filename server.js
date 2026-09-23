@@ -4,7 +4,6 @@ const mongoose = require('mongoose');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const RedisStore = require('rate-limit-redis');
-const { createClient } = require('redis');
 const Sentry = require('@sentry/node');
 const config = require('./config/env');
 const logger = require('./utils/logger');
@@ -44,17 +43,7 @@ if (config.env === 'production' && config.corsOrigins.length === 0) {
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '10kb' })); // Prevent large payload attacks
 
-// Redis Client
-let redisClient;
-if (config.redis.url && process.env.NODE_ENV !== 'test') {
-  redisClient = createClient({
-    url: config.redis.url
-  });
-  
-  redisClient.connect().catch(console.error);
-  redisClient.on('error', (err) => logger.error('Redis Client Error', err));
-  redisClient.on('ready', () => logger.info('✅ Redis Connected'));
-}
+const redisClient = require('./libs/redis');
 
 // Rate Limiting
 const apiLimiter = rateLimit({
@@ -118,8 +107,13 @@ if (process.env.NODE_ENV !== 'test') {
 if (routes) app.use('/api', routes);
 if (authRoutes) app.use('/api/auth', authRoutes);
 
-// Swagger API Docs
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
+// Swagger API Docs — only exposed outside production (or when explicitly enabled).
+const swaggerEnabled = config.env !== 'production' || process.env.SWAGGER_ENABLED === 'true';
+if (swaggerEnabled) {
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
+} else {
+  app.use('/api-docs', (req, res) => res.status(404).json({ error: 'Not found' }));
+}
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -170,4 +164,3 @@ process.on('SIGTERM', gracefulShutdown);
 process.on('SIGINT', gracefulShutdown);
 
 module.exports = app;
-module.exports.redisClient = redisClient;

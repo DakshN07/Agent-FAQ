@@ -21,3 +21,13 @@ asked_questions.json
 # Debug/coverage/output
 coverage/
 dist/
+
+# Generated caches and graph tooling artifacts
+graphify-out/
+.kilo/
+__pycache__/
+*.pyc
+
+# Environment examples only; real .env is ignored above
+.env.local
+.env.production

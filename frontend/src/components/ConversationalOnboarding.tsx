@@ -252,7 +252,7 @@ export default function ConversationalOnboarding({ onComplete, onBackToLanding }
                             {channel}
                           </div>
                           <span className="text-[10px] uppercase font-mono text-gray-500">
-                            {isChecked ? "Sync Scheduled" : "Inactive"}
+                            {isChecked ? "Selected" : "Not selected"}
                           </span>
                         </button>
                       );

@@ -31,7 +31,7 @@ export default function DashboardViews({ activeTab, connectedChannels, eventId }
           transition={{ ease: easeCurve, duration: 0.5 }}
           className="flex-1 flex flex-col"
         >
-          {activeTab === "Overview" && <OverviewView eventId={currentEventId} />}
+          {activeTab === "Overview" && <OverviewView eventId={currentEventId} connectedChannels={connectedChannels} />}
           {activeTab === "Inbox" && <InboxView eventId={currentEventId} />}
           {activeTab === "AI Agent" && <AiAgentView eventId={currentEventId} />}
           {activeTab === "Knowledge" && <KnowledgeView eventId={currentEventId} />}
@@ -45,32 +45,34 @@ export default function DashboardViews({ activeTab, connectedChannels, eventId }
 }
 
 // 1. OVERVIEW VIEW
-function OverviewView({ eventId }: { eventId: string }) {
+function OverviewView({ eventId, connectedChannels }: { eventId: string; connectedChannels: string[] }) {
   const [stats, setStats] = useState<any>({
-    totalFaqs: 18,
-    matched: 142,
-    unmatched: 12,
-    accuracy: "92.2%"
+    totalFaqs: 0,
+    matched: 0,
+    unmatched: 0,
+    accuracy: "—"
   });
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadStats() {
       try {
         setLoading(true);
+        setLoadError(null);
         const res = await api.getAnalytics(eventId);
         if (res) {
           const total = (res.matched || 0) + (res.unmatched || 0);
-          const acc = total > 0 ? `${Math.round(((res.matched || 0) / total) * 100)}%` : "94.5%";
+          const acc = total > 0 ? `${Math.round(((res.matched || 0) / total) * 100)}%` : "—";
           setStats({
-            totalFaqs: res.totalFaqs ?? 18,
-            matched: res.matched ?? 142,
-            unmatched: res.totalUnknown ?? 12,
+            totalFaqs: res.totalFaqs ?? 0,
+            matched: res.matched ?? 0,
+            unmatched: res.unmatched ?? 0,
             accuracy: acc
           });
         }
-      } catch (e) {
-        // Fallback to demo values
+      } catch (e: any) {
+        setLoadError(e?.message || "Could not load analytics");
       } finally {
         setLoading(false);
       }
@@ -83,15 +85,15 @@ function OverviewView({ eventId }: { eventId: string }) {
       {/* Intro Header */}
       <div>
         <span className="text-[10px] font-bold uppercase tracking-widest text-purple-400">System Dashboard</span>
-        <h2 className="text-3xl font-extrabold text-white mt-1">Autonomous Operations</h2>
-        <p className="text-sm text-gray-400">AI Support Agent is monitoring all active incoming pipeline streams.</p>
+        <h2 className="text-3xl font-extrabold text-white mt-1">Operations Overview</h2>
+        <p className="text-sm text-gray-400">Live view of your FAQ agent's performance across connected channels.</p>
       </div>
 
       {/* Hero Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { label: "Active Pipelines", value: "3 Active", desc: "Discord, Telegram, Slack", trend: "Optimal" },
-          { label: "AI Auto-Resolve", value: stats.accuracy, desc: `${stats.matched} queries resolved`, trend: "+1.2% this week" },
+          { label: "Channels", value: connectedChannels?.length ? `${connectedChannels.length} Connected` : "0 Connected", desc: connectedChannels?.join(", ") || "No integrations yet", trend: connectedChannels?.length ? "Active" : "Setup needed" },
+          { label: "AI Auto-Resolve", value: stats.accuracy, desc: `${stats.matched} queries resolved`, trend: "Live" },
           { label: "Knowledge Index", value: `${stats.totalFaqs} FAQs`, desc: `${stats.unmatched} pending review`, trend: "Synced" }
         ].map((stat, i) => (
           <div key={i} className="glass-card rounded-2xl p-5 border border-white/5 relative overflow-hidden group">
@@ -105,32 +107,10 @@ function OverviewView({ eventId }: { eventId: string }) {
         ))}
       </div>
 
-      {/* Status Bulletin */}
-      <div className="glass-card rounded-2xl p-6 border border-white/5 space-y-4">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-purple-400" />
-          Autonomous Action Log
-        </h3>
-        
-        <div className="space-y-3 font-mono text-xs">
-          {[
-            { time: "17:40:12", status: "INFO", message: "Successfully synced Discord thread #support-ticket-489" },
-            { time: "17:38:45", status: "RESOLVE", message: "Resolved 'How do I cancel my subscription?' with 98% confidence on Telegram" },
-            { time: "17:35:22", status: "MODERATION", message: "Flagged user @user123 for excessive repetition (67 messages) on Discord" },
-            { time: "17:32:01", status: "LEARN", message: "Draft FAQ ingested from Slack discussions regarding 'API keys configuration'" }
-          ].map((log, i) => (
-            <div key={i} className="flex gap-4 p-2.5 rounded-lg bg-white/2 border border-white/2 select-none hover:bg-white/5 transition-colors">
-              <span className="text-gray-500">{log.time}</span>
-              <span className={`font-bold ${
-                log.status === "RESOLVE" ? "text-emerald-400" :
-                log.status === "MODERATION" ? "text-amber-400" :
-                log.status === "LEARN" ? "text-blue-400" : "text-gray-400"
-              }`}>{log.status}</span>
-              <span className="text-gray-300">{log.message}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      {loading && <p className="text-xs text-gray-500 font-mono">Refreshing data…</p>}
+      {loadError && (
+        <p className="text-xs text-red-400 font-mono">Could not load analytics: {loadError}</p>
+      )}
     </div>
   );
 }
@@ -147,106 +127,101 @@ interface Ticket {
   id: string;
   user: string;
   issue: string;
-  channel: "Discord" | "Telegram" | "Slack";
-  status: "Answered" | "Pending Review";
+  channel: "Discord" | "Telegram" | "Slack" | "Web";
+  status: "Answered" | "Pending Review" | "Pending" | "Escalated";
   time: string;
   messages: ChatMessage[];
 }
 
 function InboxView({ eventId }: { eventId: string }) {
-  const [tickets, setTickets] = useState<Ticket[]>([
-    {
-      id: "1",
-      user: "John Doe",
-      issue: "Password reset link is broken",
-      channel: "Discord",
-      status: "Pending Review",
-      time: "2m ago",
-      messages: [
-        { sender: "John Doe", text: "Hey support! The password reset link you emailed me returns a 404.", time: "2m ago" },
-        { sender: "AI Assistant", text: "Hi John! I've checked the link generator. Please try requests with a fresh token. Let me know if that works.", time: "1m ago", isAi: true }
-      ]
-    },
-    {
-      id: "2",
-      user: "Aisha Patel",
-      issue: "Do you support Stripe payment methods?",
-      channel: "Telegram",
-      status: "Answered",
-      time: "12m ago",
-      messages: [
-        { sender: "Aisha Patel", text: "Hello, looking to pay with Stripe, is that supported?", time: "15m ago" },
-        { sender: "AI Assistant", text: "Yes! We support credit cards, Apple Pay, and Google Pay through Stripe billing.", time: "12m ago", isAi: true }
-      ]
-    },
-    {
-      id: "3",
-      user: "Liam Johnson",
-      issue: "Refunding order #1085",
-      channel: "Slack",
-      status: "Pending Review",
-      time: "18m ago",
-      messages: [
-        { sender: "Liam Johnson", text: "I need to refund order #1085. It has been three days and it hasn't shipped.", time: "18m ago" }
-      ]
-    }
-  ]);
-
-  const [selectedTicketId, setSelectedTicketId] = useState<string>("1");
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [selectedTicketId, setSelectedTicketId] = useState<string>("");
   const [chatInput, setChatInput] = useState("");
-  const [activeChannelFilter, setActiveChannelFilter] = useState<"All" | "Discord" | "Telegram" | "Slack">("All");
+  const [activeChannelFilter, setActiveChannelFilter] = useState<"All" | "Discord" | "Telegram" | "Slack" | "Web">("All");
 
-  const activeTicket = tickets.find((t) => t.id === selectedTicketId) || tickets[0];
+  useEffect(() => {
+    if (!eventId || eventId === "default_event") {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    async function loadConversations() {
+      try {
+        setLoading(true);
+        setLoadError(null);
+        const convs = await api.getConversations(eventId);
+        if (cancelled) return;
+        if (!Array.isArray(convs)) {
+          setTickets([]);
+          return;
+        }
+        const mapped: Ticket[] = convs.map((c: any) => {
+          const platform = (c.platform || c.sourcePlatform || 'web').toLowerCase();
+          const channel = platform.includes('discord') ? "Discord"
+            : platform.includes('slack') ? "Slack"
+            : platform.includes('telegram') ? "Telegram" : "Web";
+          return {
+            id: c._id,
+            user: c.userId?.username || c.userId?.email || c.senderName || "Anonymous",
+            issue: c.subject || c.lastMessage?.text || c.text || "Conversation",
+            channel,
+            status: c.status || "Pending",
+            time: c.lastMessageAt ? new Date(c.lastMessageAt).toLocaleString() : "",
+            messages: []
+          };
+        });
+        setTickets(mapped);
+        if (mapped.length > 0 && !cancelled) {
+          setSelectedTicketId((prev) => prev || mapped[0].id);
+        }
+      } catch (e: any) {
+        if (!cancelled) setLoadError(e?.message || "Could not load conversations");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    loadConversations();
+    return () => { cancelled = true; };
+  }, [eventId]);
+
+  // Load messages for the selected conversation from the API.
+  useEffect(() => {
+    if (!eventId || !selectedTicketId || eventId === "default_event") return;
+
+    setChatInput("");
+    setTickets((prev) => prev.map((t) => t.id === selectedTicketId ? { ...t, messages: [] } : t));
+
+    let cancelled = false;
+    async function loadMessages() {
+      try {
+        const msgs = await api.getMessages(eventId, selectedTicketId);
+        if (cancelled || !Array.isArray(msgs)) return;
+        const mapped: ChatMessage[] = msgs.map((m: any) => ({
+          sender: m.senderType === 'Agent' || m.isBot ? "AI Assistant"
+            : m.senderType === 'User' ? (m.senderName || "User")
+            : m.senderName || m.senderType || "User",
+          text: m.text || m.content || "",
+          time: m.createdAt ? new Date(m.createdAt).toLocaleString() : "",
+          isAi: m.senderType === 'Agent' || !!m.isBot
+        }));
+        setTickets((prev) =>
+          prev.map((t) => t.id === selectedTicketId ? { ...t, messages: mapped, status: mapped.length ? t.status : t.status } : t)
+        );
+      } catch {
+        // Leave the message thread empty; the chat area will show an empty state.
+      }
+    }
+    loadMessages();
+    return () => { cancelled = true; };
+  }, [eventId, selectedTicketId]);
+
+  const activeTicket = tickets.find((t) => t.id === selectedTicketId) || null;
 
   const filteredTickets = tickets.filter(
     (t) => activeChannelFilter === "All" || t.channel === activeChannelFilter
   );
-
-  const sendMessage = () => {
-    if (!chatInput.trim() || !activeTicket) return;
-
-    const newMessage: ChatMessage = {
-      sender: "You",
-      text: chatInput,
-      time: "Just now"
-    };
-
-    setTickets((prev) =>
-      prev.map((t) =>
-        t.id === activeTicket.id
-          ? {
-              ...t,
-              status: "Answered",
-              messages: [...t.messages, newMessage]
-            }
-          : t
-      )
-    );
-
-    setChatInput("");
-  };
-
-  const approveAiDraft = () => {
-    if (!activeTicket) return;
-    const aiDraftMessage: ChatMessage = {
-      sender: "AI Assistant",
-      text: "Draft approved by human manager: We have dispatched a resolution update to your profile settings. Thank you for your patience!",
-      time: "Just now",
-      isAi: true
-    };
-
-    setTickets((prev) =>
-      prev.map((t) =>
-        t.id === activeTicket.id
-          ? {
-              ...t,
-              status: "Answered",
-              messages: [...t.messages, aiDraftMessage]
-            }
-          : t
-      )
-    );
-  };
 
   return (
     <div className="flex-1 flex gap-6 min-h-[500px]">
@@ -255,7 +230,7 @@ function InboxView({ eventId }: { eventId: string }) {
       <div className="w-80 border-r border-white/5 pr-4 flex flex-col gap-4">
         {/* Channel Filters */}
         <div className="flex gap-1.5 p-1 bg-white/2 rounded-lg border border-white/5 text-xs">
-          {(["All", "Discord", "Telegram", "Slack"] as const).map((filter) => (
+          {(["All", "Discord", "Telegram", "Slack", "Web"] as const).map((filter) => (
             <button
               key={filter}
               onClick={() => setActiveChannelFilter(filter)}
@@ -270,9 +245,13 @@ function InboxView({ eventId }: { eventId: string }) {
 
         {/* List */}
         <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-          {filteredTickets.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-12 text-xs text-gray-500">Loading conversations…</div>
+          ) : loadError ? (
+            <div className="text-center py-12 text-xs text-red-400">{loadError}</div>
+          ) : filteredTickets.length === 0 ? (
             <div className="text-center py-12 text-xs text-gray-500">
-              No conversations in this stream.
+              No conversations yet. Messages from connected channels will appear here.
             </div>
           ) : (
             filteredTickets.map((ticket) => {
@@ -296,7 +275,8 @@ function InboxView({ eventId }: { eventId: string }) {
                   <div className="flex justify-between items-center w-full mt-3">
                     <span className={`text-[10px] font-bold uppercase tracking-wider ${
                       ticket.channel === "Discord" ? "text-indigo-400" :
-                      ticket.channel === "Telegram" ? "text-blue-400" : "text-emerald-400"
+                      ticket.channel === "Telegram" ? "text-blue-400" : 
+                      ticket.channel === "Slack" ? "text-emerald-400" : "text-gray-400"
                     }`}>{ticket.channel}</span>
                     
                     <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
@@ -312,7 +292,7 @@ function InboxView({ eventId }: { eventId: string }) {
         </div>
       </div>
 
-      {/* 2. Interactive Message Log View */}
+      {/* 2. Message Log View */}
       <div className="flex-1 flex flex-col justify-between bg-black/40 border border-white/5 rounded-2xl overflow-hidden relative">
         {activeTicket ? (
           <>
@@ -334,14 +314,17 @@ function InboxView({ eventId }: { eventId: string }) {
 
             {/* Chat Body */}
             <div className="flex-1 p-5 overflow-y-auto space-y-4">
-              {activeTicket.messages.map((msg, i) => (
-                <div key={i} className={`flex flex-col ${msg.sender === "You" || msg.isAi ? "items-end" : "items-start"}`}>
+              {activeTicket.messages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center">
+                  <MessageSquare className="w-8 h-8 text-gray-600 mb-2" />
+                  <p className="text-xs text-gray-500">No messages loaded for this conversation.</p>
+                </div>
+              ) : activeTicket.messages.map((msg, i) => (
+                <div key={i} className={`flex flex-col ${msg.isAi ? "items-end" : "items-start"}`}>
                   <div className={`max-w-[75%] rounded-2xl p-4 text-xs leading-relaxed ${
                     msg.isAi 
                       ? "bg-purple-950/20 border border-purple-500/20 text-purple-200" 
-                      : msg.sender === "You" 
-                        ? "bg-white text-black font-medium" 
-                        : "bg-white/5 border border-white/5 text-white"
+                      : "bg-white/5 border border-white/5 text-white"
                   }`}>
                     {msg.text}
                   </div>
@@ -350,47 +333,25 @@ function InboxView({ eventId }: { eventId: string }) {
               ))}
             </div>
 
-            {/* Floating review suggestion if pending */}
-            {activeTicket.status === "Pending Review" && (
-              <div className="mx-4 mb-3 p-4 bg-purple-950/10 border border-purple-500/20 rounded-xl flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  <Bot className="w-5 h-5 text-purple-400 animate-pulse" />
-                  <div>
-                    <h5 className="text-[11px] font-bold text-white">AI Response Draft Ready</h5>
-                    <p className="text-[10px] text-gray-400">Review drafted answer to auto-send and update system FAQs.</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={approveAiDraft}
-                  className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg text-[10px] shadow-md transition-colors cursor-pointer"
-                >
-                  Approve Response
-                </button>
-              </div>
-            )}
-
             {/* Chat Input */}
-            <div className="p-4 border-t border-white/5 bg-white/2 flex gap-3">
+            <div className="p-4 border-t border-white/5 bg-white/2">
               <input
                 type="text"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
-                placeholder={`Reply to ${activeTicket.user} directly...`}
-                onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-                className="flex-1 py-3 px-4 bg-white/5 border border-white/5 rounded-xl text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
+                placeholder="Manual replies are not enabled yet"
+                disabled
+                className="w-full py-3 px-4 bg-white/5 border border-white/5 rounded-xl text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-purple-500 transition-colors opacity-60 cursor-not-allowed"
               />
-              <button 
-                onClick={sendMessage}
-                className="p-3 bg-white text-black hover:bg-gray-100 rounded-xl transition-all cursor-pointer flex items-center justify-center shadow-md"
-              >
-                <Send className="w-4 h-4" />
-              </button>
+              <p className="text-[9px] text-gray-500 text-center mt-2 font-mono">
+                Automated AI replies are sent through connected channels. Manual replies are coming soon.
+              </p>
             </div>
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
             <MessageSquare className="w-10 h-10 text-gray-500 mb-2" />
-            <span className="text-xs text-gray-400">Select a conversation to reply.</span>
+            <span className="text-xs text-gray-400">{loading ? "Loading conversations…" : "Select a conversation to view."}</span>
           </div>
         )}
       </div>
@@ -408,12 +369,7 @@ interface ChatConsoleMessage {
 }
 
 function AiAgentView({ eventId }: { eventId: string }) {
-  const [messages, setMessages] = useState<ChatConsoleMessage[]>([
-    {
-      role: "agent",
-      content: "AI Operating System active. Use chips below or type queries like:\n- Show unanswered questions\n- Which users are spamming?\n- Suggest new FAQ guidelines"
-    }
-  ]);
+  const [messages, setMessages] = useState<ChatConsoleMessage[]>([]);
   const [consoleInput, setConsoleInput] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -422,45 +378,23 @@ function AiAgentView({ eventId }: { eventId: string }) {
     setLoading(true);
 
     try {
-      // Try to ask backend AI service
+      // Ask the backend AI service
       const res = await api.askAI(prompt);
       if (res && res.answer) {
         setMessages((prev) => [...prev, { role: "agent", content: res.answer }]);
         setLoading(false);
         return;
       }
-    } catch (e) {
-      // Fallback to local intelligent rules
-    }
-
-    setTimeout(() => {
-      const response: ChatConsoleMessage = { role: "agent", content: "" };
-      const normalized = prompt.toLowerCase();
-
-      if (normalized.includes("unanswered")) {
-        response.content = "There are currently 12 unanswered questions across all active ingestion streams.";
-        response.category = "unanswered";
-        response.details = {
-          commonTopic: "Payment Inquiries",
-          occurrences: 9,
-          list: ["Stripe payment decline reasons", "Where to download tax receipts", "Supported crypto currencies"]
-        };
-      } else if (normalized.includes("spam")) {
-        response.content = "Detected 3 active users flagged for spamming/repetition.";
-        response.category = "spam";
-        response.details = {
-          highRisk: "User123",
-          channel: "Discord",
-          count: 42,
-          message: "'When will ticket sales open?' repeated in 8 support channels."
-        };
-      } else {
-        response.content = `Understood. Analyzing parameters for query: "${prompt}". Confidence score: 96.4%. Standard FAQ vector similarity is operational across Discord, Slack, and Telegram channels.`;
-      }
-
-      setMessages((prev) => [...prev, response]);
+      setMessages((prev) => [...prev, { role: "agent", content: "The AI service returned no answer. Please try again." }]);
+    } catch (e: any) {
+      // Never fabricate a response — surface the failure honestly.
+      setMessages((prev) => [
+        ...prev,
+        { role: "agent", content: `AI service unavailable${e?.message ? `: ${e.message}` : ""}. Check that the backend and AI provider are configured.` }
+      ]);
+    } finally {
       setLoading(false);
-    }, 800);
+    }
   };
 
   const handleSend = () => {
@@ -477,7 +411,7 @@ function AiAgentView({ eventId }: { eventId: string }) {
           <Bot className="w-5 h-5 text-purple-400 animate-pulse" />
           <h4 className="text-xs font-bold text-white font-mono uppercase tracking-widest">AI Console Terminal</h4>
         </div>
-        <span className="text-[10px] text-emerald-400 font-bold font-mono">STATUS: ONLINE</span>
+        <span className="text-[10px] text-emerald-400 font-bold font-mono">STATUS: {loading ? "PROCESSING" : "ONLINE"}</span>
       </div>
 
       {/* Chat Terminal Log */}
@@ -593,20 +527,12 @@ interface FAQSuggestion {
 }
 
 function KnowledgeView({ eventId }: { eventId: string }) {
-  const [faqs, setFaqs] = useState<FAQItem[]>([
-    { id: "1", q: "How do I upgrade to the developer subscription?", a: "Go to Billing Settings page and click Upgrade Plan. We support Stripe card payments.", usage: 142, confidence: 99.4, lastUpdated: "2d ago", platforms: ["discord", "slack", "telegram"] },
-    { id: "2", q: "Can I connect multiple Discord bots?", a: "Yes, you can register secondary bots under the integrations panel.", usage: 89, confidence: 98.2, lastUpdated: "5d ago", platforms: ["discord"] },
-    { id: "3", q: "Where can I view API documentation?", a: "The official API schemas are available in /api-docs endpoint.", usage: 67, confidence: 95.8, lastUpdated: "1d ago", platforms: ["discord", "slack"] }
-  ]);
-
-  const [suggestions, setSuggestions] = useState<FAQSuggestion[]>([
-    { id: "s1", q: "What is your refund policy?", count: 37 },
-    { id: "s2", q: "How to export telemetry reports?", count: 18 }
-  ]);
-
+  const [faqs, setFaqs] = useState<FAQItem[]>([]);
+  const [suggestions, setSuggestions] = useState<FAQSuggestion[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [editingFaq, setEditingFaq] = useState<FAQItem | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadFaqs() {
@@ -617,13 +543,17 @@ function KnowledgeView({ eventId }: { eventId: string }) {
             id: f._id || f.id,
             q: f.question,
             a: f.answer,
-            usage: f.count || 1,
-            confidence: 98.5,
-            lastUpdated: "Synced",
-            platforms: f.platforms || ['discord', 'slack', 'telegram']
+            usage: f.count || 0,
+            confidence: f.confidence ?? undefined,
+            lastUpdated: f.updatedAt ? new Date(f.updatedAt).toLocaleDateString() : undefined,
+            platforms: f.platforms || []
           })));
+        } else {
+          setFaqs([]);
         }
-      } catch (e) {}
+      } catch (e: any) {
+        setActionError(e?.message || "Could not load FAQs");
+      }
 
       try {
         const suggData = await api.getSuggestions(eventId);
@@ -633,8 +563,12 @@ function KnowledgeView({ eventId }: { eventId: string }) {
             q: s.text || s.question,
             count: s.count || 1
           })));
+        } else {
+          setSuggestions([]);
         }
-      } catch (e) {}
+      } catch {
+        // suggestions simply stay empty
+      }
     }
     loadFaqs();
   }, [eventId]);
@@ -642,12 +576,13 @@ function KnowledgeView({ eventId }: { eventId: string }) {
   const filteredFaqs = faqs.filter(
     (faq) =>
       faq.q.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      faq.a.toLowerCase().includes(searchQuery.toLowerCase())
+      (faq.a || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleSaveFaq = async () => {
     if (!editingFaq || !editingFaq.q.trim() || !editingFaq.a.trim()) return;
     setIsSaving(true);
+    setActionError(null);
 
     try {
       if (editingFaq.id === "new") {
@@ -655,16 +590,16 @@ function KnowledgeView({ eventId }: { eventId: string }) {
           eventId,
           question: editingFaq.q,
           answer: editingFaq.a,
-          platforms: editingFaq.platforms || ['discord', 'slack', 'telegram']
+          platforms: editingFaq.platforms || []
         });
         const newFaq: FAQItem = {
           id: created?._id || String(Date.now()),
           q: editingFaq.q,
           a: editingFaq.a,
           usage: 0,
-          confidence: 100,
+          confidence: undefined,
           lastUpdated: "Just now",
-          platforms: editingFaq.platforms || ['discord', 'slack', 'telegram']
+          platforms: editingFaq.platforms || []
         };
         setFaqs([newFaq, ...faqs]);
       } else {
@@ -675,13 +610,9 @@ function KnowledgeView({ eventId }: { eventId: string }) {
         });
         setFaqs(faqs.map(f => f.id === editingFaq.id ? { ...f, q: editingFaq.q, a: editingFaq.a } : f));
       }
-    } catch (err) {
-      // Local optimistic fallback
-      if (editingFaq.id === "new") {
-        setFaqs([{ ...editingFaq, id: String(Date.now()) }, ...faqs]);
-      } else {
-        setFaqs(faqs.map(f => f.id === editingFaq.id ? editingFaq : f));
-      }
+    } catch (err: any) {
+      // Never fake a save — surface the error to the user.
+      setActionError(err?.message || "Could not save the FAQ. Please try again.");
     } finally {
       setIsSaving(false);
       setEditingFaq(null);
@@ -691,7 +622,10 @@ function KnowledgeView({ eventId }: { eventId: string }) {
   const handleDeleteFaq = async (id: string) => {
     try {
       await api.deleteFaq(id);
-    } catch (e) {}
+    } catch (e: any) {
+      setActionError(e?.message || "Could not delete the FAQ.");
+      return;
+    }
     setFaqs(faqs.filter(f => f.id !== id));
   };
 
@@ -699,21 +633,26 @@ function KnowledgeView({ eventId }: { eventId: string }) {
     const newFaq: FAQItem = {
       id: String(Date.now()),
       q: s.q,
-      a: "Approved response: Please contact support or check documentation.",
+      a: "",
       usage: s.count,
-      confidence: 90.0,
+      confidence: undefined,
       lastUpdated: "Just now",
-      platforms: ["discord", "slack", "telegram"]
+      platforms: []
     };
 
     try {
-      await api.createFaq({
+      const created = await api.createFaq({
         eventId,
         question: newFaq.q,
         answer: newFaq.a,
         platforms: newFaq.platforms
       });
-    } catch (e) {}
+      newFaq.id = created?._id || newFaq.id;
+      newFaq.a = created?.answer || "";
+    } catch (e: any) {
+      setActionError(e?.message || "Could not approve this suggestion.");
+      return;
+    }
 
     setFaqs((prev) => [newFaq, ...prev]);
     setSuggestions((prev) => prev.filter((item) => item.id !== s.id));
@@ -739,13 +678,17 @@ function KnowledgeView({ eventId }: { eventId: string }) {
         </div>
 
         <button 
-          onClick={() => setEditingFaq({ id: "new", q: "", a: "", usage: 0, confidence: 100, lastUpdated: "Just now", platforms: ["discord", "slack", "telegram"] })}
+          onClick={() => setEditingFaq({ id: "new", q: "", a: "", usage: 0, confidence: undefined, lastUpdated: "Just now", platforms: [] })}
           className="px-4 py-2 bg-white text-black font-semibold rounded-xl text-xs hover:bg-gray-100 transition-colors flex items-center gap-1.5 cursor-pointer shadow-md"
         >
           <Plus className="w-3.5 h-3.5" />
           Add Manual FAQ
         </button>
       </div>
+
+      {actionError && (
+        <p className="text-xs text-red-400 font-mono">{actionError}</p>
+      )}
 
       {/* Suggested FAQ Area (Human Ingestion queue) */}
       {suggestions.length > 0 && (
@@ -821,7 +764,7 @@ function KnowledgeView({ eventId }: { eventId: string }) {
                     </button>
                   </div>
                   <span className="text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                    {faq.confidence || 98.5}% Conf.
+                    {faq.confidence != null ? `${faq.confidence}% Conf.` : "—"}
                   </span>
                 </div>
               </div>
@@ -897,36 +840,45 @@ function KnowledgeView({ eventId }: { eventId: string }) {
 // 5. ANALYTICS VIEW
 function AnalyticsView({ eventId }: { eventId: string }) {
   const [data, setData] = useState<any>({
-    totalQueries: 23451,
-    resolvedRate: "89%",
-    escalatedRate: "11%",
-    perPlatform: { discord: 48, telegram: 34, slack: 18 }
+    totalQueries: 0,
+    resolvedRate: "—",
+    escalatedRate: "—",
+    perPlatform: { discord: 0, telegram: 0, slack: 0, web: 0 }
   });
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadAnalytics() {
       try {
+        setLoading(true);
+        setLoadError(null);
         const res = await api.getAnalytics(eventId);
         if (res) {
-          const total = (res.matched || 0) + (res.unmatched || 0);
-          const resolved = total > 0 ? `${Math.round(((res.matched || 0) / total) * 100)}%` : "89%";
-          const escalated = total > 0 ? `${Math.round(((res.unmatched || 0) / total) * 100)}%` : "11%";
+          const total = (res.totalQueries || 0);
+          const resolved = total > 0 ? `${Math.round(((res.matched || 0) / total) * 100)}%` : "—";
+          const escalated = total > 0 ? `${Math.round(((res.unmatched || 0) / total) * 100)}%` : "—";
           setData({
-            totalQueries: total || 23451,
+            totalQueries: total,
             resolvedRate: resolved,
             escalatedRate: escalated,
-            perPlatform: res.perPlatform || { discord: 48, telegram: 34, slack: 18 }
+            perPlatform: res.perPlatform || { discord: 0, telegram: 0, slack: 0, web: 0 }
           });
         }
-      } catch (e) {}
+      } catch (e: any) {
+        setLoadError(e?.message || "Could not load analytics");
+      } finally {
+        setLoading(false);
+      }
     }
     loadAnalytics();
   }, [eventId]);
 
   const channelData = [
-    { name: "Discord", share: data.perPlatform?.discord || 48, color: "bg-indigo-500" },
-    { name: "Telegram", share: data.perPlatform?.telegram || 34, color: "bg-blue-500" },
-    { name: "Slack", share: data.perPlatform?.slack || 18, color: "bg-emerald-500" }
+    { name: "Discord", share: data.perPlatform?.discord || 0, color: "bg-indigo-500" },
+    { name: "Telegram", share: data.perPlatform?.telegram || 0, color: "bg-blue-500" },
+    { name: "Slack", share: data.perPlatform?.slack || 0, color: "bg-emerald-500" },
+    { name: "Web", share: data.perPlatform?.web || 0, color: "bg-purple-500" }
   ];
 
   return (
@@ -934,9 +886,9 @@ function AnalyticsView({ eventId }: { eventId: string }) {
       {/* Top metrics */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Total Ingested Messages", value: data.totalQueries.toLocaleString(), trend: "+17%", isGreen: true },
-          { label: "Resolved by AI Bot", value: data.resolvedRate, trend: "Optimal Accuracy", isGreen: true },
-          { label: "Escalated to Humans", value: data.escalatedRate, trend: "Pending Action", isGreen: false }
+          { label: "Total Queries", value: data.totalQueries.toLocaleString(), trend: "All-time", isGreen: true },
+          { label: "Resolved by AI Bot", value: data.resolvedRate, trend: "Match rate", isGreen: true },
+          { label: "Escalated to Humans", value: data.escalatedRate, trend: "Unmatched rate", isGreen: false }
         ].map((card, i) => (
           <div key={i} className="glass-card rounded-2xl p-5 border border-white/5 relative">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">{card.label}</span>
@@ -948,22 +900,29 @@ function AnalyticsView({ eventId }: { eventId: string }) {
         ))}
       </div>
 
+      {loading && <p className="text-xs text-gray-500 font-mono">Loading analytics…</p>}
+      {loadError && <p className="text-xs text-red-400 font-mono">Could not load analytics: {loadError}</p>}
+
       {/* Platform Breakdown */}
       <div className="glass-card rounded-2xl p-6 border border-white/5 space-y-4">
         <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">Platform Query Distribution</h3>
-        <div className="space-y-3">
-          {channelData.map((c) => (
-            <div key={c.name} className="space-y-1">
-              <div className="flex justify-between text-xs font-mono">
-                <span className="text-gray-300">{c.name}</span>
-                <span className="text-gray-400">{c.share}%</span>
+        {data.totalQueries === 0 && !loading ? (
+          <p className="text-xs text-gray-500 font-mono">No analytics recorded yet for this event.</p>
+        ) : (
+          <div className="space-y-3">
+            {channelData.map((c) => (
+              <div key={c.name} className="space-y-1">
+                <div className="flex justify-between text-xs font-mono">
+                  <span className="text-gray-300">{c.name}</span>
+                  <span className="text-gray-400">{c.share}%</span>
+                </div>
+                <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+                  <div className={`h-full ${c.color} rounded-full`} style={{ width: `${c.share}%` }} />
+                </div>
               </div>
-              <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
-                <div className={`h-full ${c.color} rounded-full`} style={{ width: `${c.share}%` }} />
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -980,32 +939,40 @@ interface FlaggedUser {
 }
 
 function ModerationView({ eventId }: { eventId: string }) {
-  const [toxicUsers, setToxicUsers] = useState<FlaggedUser[]>([
-    { id: "1", name: "SpammyMcSpam", platform: "Discord", reason: "Repetition limit exceeded (67 messages in #support)", severity: "High", status: "Flagged" },
-    { id: "2", name: "Alice45", platform: "Telegram", reason: "Hostile language matched toxic keywords threshold", severity: "Medium", status: "Flagged" },
-    { id: "3", name: "InjectedUser", platform: "Slack", reason: "Detected ChatGPT instruction overrides (injection)", severity: "High", status: "Flagged" },
-    { id: "4", name: "BotTester", platform: "Slack", reason: "Repeated API abuse queries", severity: "Low", status: "Flagged" }
-  ]);
+  const [toxicUsers, setToxicUsers] = useState<FlaggedUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [activeCategory, setActiveCategory] = useState<"Toxic" | "Spammer" | "Injection">("Toxic");
 
   useEffect(() => {
+    let cancelled = false;
     async function loadModeration() {
       try {
+        setLoading(true);
+        setLoadError(null);
         const events = await api.getModerationEvents(eventId);
+        if (cancelled) return;
         if (Array.isArray(events) && events.length > 0) {
           setToxicUsers(events.map((e: any, idx: number) => ({
             id: e._id || String(idx),
             name: e.userId?.username || e.user || `User_${idx}`,
-            platform: e.platform || "Discord",
+            platform: e.platform || "Web",
             reason: e.reason || "Policy violation",
             severity: e.severity || "Medium",
             status: e.status || "Flagged"
           })));
+        } else {
+          setToxicUsers([]);
         }
-      } catch (e) {}
+      } catch (e: any) {
+        if (!cancelled) setLoadError(e?.message || "Could not load moderation events");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
     loadModeration();
+    return () => { cancelled = true; };
   }, [eventId]);
 
   const handleAction = (id: string, action: "Blocked" | "Dismissed") => {
@@ -1017,101 +984,75 @@ function ModerationView({ eventId }: { eventId: string }) {
   return (
     <div className="space-y-6">
       <div>
-        <span className="text-[10px] font-bold uppercase tracking-widest text-red-400 font-mono">Real-time Defense</span>
-        <h2 className="text-3xl font-extrabold text-white mt-1">Autonomous Moderation Shield</h2>
-        <p className="text-sm text-gray-400">Active heuristic monitoring on toxic behaviors, prompt injection attempts, and spammers.</p>
+        <span className="text-[10px] font-bold uppercase tracking-widest text-red-400 font-mono">Moderation Center</span>
+        <h2 className="text-3xl font-extrabold text-white mt-1">Moderation Queue</h2>
+        <p className="text-sm text-gray-400">Flagged users and messages detected across connected channels.</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {[
-          { title: "Hostile Language", category: "Toxic", value: "8 Flags", iconColor: "text-amber-400 bg-amber-500/10" },
-          { title: "Spam / Flooding", category: "Spammer", value: "14 Blocked", iconColor: "text-red-400 bg-red-500/10" },
-          { title: "Prompt Injections", category: "Injection", value: "5 Intercepts", iconColor: "text-purple-400 bg-purple-500/10" }
-        ].map((item) => {
-          const isActive = activeCategory === item.category;
-          return (
-            <button
-              key={item.category}
-              onClick={() => setActiveCategory(item.category as any)}
-              className={`p-5 rounded-2xl border text-left flex items-start gap-4 transition-all cursor-pointer ${
-                isActive 
-                  ? "bg-white/5 border-purple-500/30 text-white shadow-[0_0_20px_rgba(168,85,247,0.1)]" 
-                  : "bg-white/2 border-white/2 hover:border-white/5 text-gray-400"
-              }`}
-            >
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${item.iconColor}`}>
-                <Shield className="w-5 h-5" />
-              </div>
-              <div>
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">{item.title}</span>
-                <div className="text-xl font-bold text-white mt-1 font-mono">{item.value}</div>
-              </div>
-            </button>
-          );
-        })}
-      </div>
+      {loading ? (
+        <p className="text-xs text-gray-500 font-mono">Loading moderation events…</p>
+      ) : loadError ? (
+        <p className="text-xs text-red-400 font-mono">Could not load moderation events: {loadError}</p>
+      ) : toxicUsers.filter(u => u.status === "Flagged").length === 0 ? (
+        <p className="text-xs text-gray-500 font-mono">No flagged activity to review.</p>
+      ) : (
+        <>
+          {/* Flagged user table */}
+          <div className="glass-card rounded-2xl border border-white/5 overflow-hidden">
+            <div className="p-4 border-b border-white/5 bg-white/2 flex items-center justify-between">
+              <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider">
+                Flagged Users ({toxicUsers.filter(u => u.status === "Flagged").length})
+              </h4>
+              <span className="text-[10px] text-gray-500 font-mono">Live from moderation pipeline</span>
+            </div>
 
-      {/* Flagged user table */}
-      <div className="glass-card rounded-2xl border border-white/5 overflow-hidden">
-        <div className="p-4 border-b border-white/5 bg-white/2 flex items-center justify-between">
-          <h4 className="text-xs font-bold text-white font-mono uppercase tracking-wider">
-            Reviewing Category: {activeCategory}
-          </h4>
-          <span className="text-[10px] text-gray-500 font-mono">Actions feed real-time firewalls</span>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs font-mono border-collapse">
-            <thead>
-              <tr className="border-b border-white/5 text-gray-500 text-[10px] uppercase font-bold bg-white/1">
-                <th className="p-4">User</th>
-                <th className="p-4">Platform</th>
-                <th className="p-4">Reason</th>
-                <th className="p-4">Severity</th>
-                <th className="p-4 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {toxicUsers.filter(u => u.status === "Flagged").map((user) => (
-                <tr key={user.id} className="border-b border-white/2 hover:bg-white/1 transition-all">
-                  <td className="p-4 text-white font-bold">{user.name}</td>
-                  <td className="p-4 text-gray-400">{user.platform}</td>
-                  <td className="p-4 text-gray-400 max-w-xs truncate">{user.reason}</td>
-                  <td className="p-4">
-                    <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${
-                      user.severity === "High" ? "bg-red-500/10 text-red-400" :
-                      user.severity === "Medium" ? "bg-amber-500/10 text-amber-400" : "bg-blue-500/10 text-blue-400"
-                    }`}>
-                      {user.severity}
-                    </span>
-                  </td>
-                  <td className="p-4 text-right flex justify-end gap-2">
-                    <button
-                      onClick={() => handleAction(user.id, "Dismissed")}
-                      className="px-2.5 py-1.5 bg-white/2 hover:bg-white/5 border border-white/5 text-gray-400 hover:text-white rounded-lg text-[10px] font-semibold transition-colors cursor-pointer"
-                    >
-                      Dismiss
-                    </button>
-                    <button
-                      onClick={() => handleAction(user.id, "Blocked")}
-                      className="px-2.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-[10px] font-semibold transition-colors cursor-pointer shadow-md"
-                    >
-                      Block User
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {toxicUsers.filter(u => u.status === "Flagged").length === 0 && (
-                <tr>
-                  <td colSpan={5} className="p-8 text-center text-gray-500">
-                    All clear. No pending reviews for {activeCategory} violations.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs font-mono border-collapse">
+                <thead>
+                  <tr className="border-b border-white/5 text-gray-500 text-[10px] uppercase font-bold bg-white/1">
+                    <th className="p-4">User</th>
+                    <th className="p-4">Platform</th>
+                    <th className="p-4">Reason</th>
+                    <th className="p-4">Severity</th>
+                    <th className="p-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {toxicUsers.filter(u => u.status === "Flagged").map((user) => (
+                    <tr key={user.id} className="border-b border-white/2 hover:bg-white/1 transition-all">
+                      <td className="p-4 text-white font-bold">{user.name}</td>
+                      <td className="p-4 text-gray-400">{user.platform}</td>
+                      <td className="p-4 text-gray-400 max-w-xs truncate">{user.reason}</td>
+                      <td className="p-4">
+                        <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${
+                          user.severity === "High" ? "bg-red-500/10 text-red-400" :
+                          user.severity === "Medium" ? "bg-amber-500/10 text-amber-400" : "bg-blue-500/10 text-blue-400"
+                        }`}>
+                          {user.severity}
+                        </span>
+                      </td>
+                      <td className="p-4 text-right flex justify-end gap-2">
+                        <button
+                          onClick={() => handleAction(user.id, "Dismissed")}
+                          className="px-2.5 py-1.5 bg-white/2 hover:bg-white/5 border border-white/5 text-gray-400 hover:text-white rounded-lg text-[10px] font-semibold transition-colors cursor-pointer"
+                        >
+                          Dismiss
+                        </button>
+                        <button
+                          onClick={() => handleAction(user.id, "Blocked")}
+                          className="px-2.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-[10px] font-semibold transition-colors cursor-pointer shadow-md"
+                        >
+                          Block User
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -1120,9 +1061,10 @@ function ModerationView({ eventId }: { eventId: string }) {
 function SettingsView() {
   const [similarityThreshold, setSimilarityThreshold] = useState(0.85);
   const [autoRespond, setAutoRespond] = useState(true);
-  const [notificationEmail, setNotificationEmail] = useState("admin@acme.com");
+  const [notificationEmail, setNotificationEmail] = useState("");
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadSettings() {
@@ -1133,13 +1075,16 @@ function SettingsView() {
           if (s.autoRespond !== undefined) setAutoRespond(s.autoRespond);
           if (s.notificationEmail) setNotificationEmail(s.notificationEmail);
         }
-      } catch (e) {}
+      } catch (e) {
+        // Global settings are loaded lazily; leave defaults if unavailable.
+      }
     }
     loadSettings();
   }, []);
 
   const handleSave = async () => {
     setIsSaving(true);
+    setSaveError(null);
     try {
       await api.updateSettings({
         similarityThreshold,
@@ -1148,9 +1093,9 @@ function SettingsView() {
       });
       setIsSaved(true);
       setTimeout(() => setIsSaved(false), 3000);
-    } catch (e) {
-      setIsSaved(true);
-      setTimeout(() => setIsSaved(false), 3000);
+    } catch (e: any) {
+      // Never show success when the save failed.
+      setSaveError(e?.message || "Could not save settings. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -1205,6 +1150,11 @@ function SettingsView() {
 
         {/* Save button */}
         <div className="flex justify-end gap-3 pt-2">
+          {saveError && (
+            <span className="text-xs text-red-400 flex items-center gap-1">
+              <AlertTriangle className="w-3.5 h-3.5" /> {saveError}
+            </span>
+          )}
           {isSaved && (
             <span className="text-xs text-emerald-400 flex items-center gap-1">
               <Check className="w-3.5 h-3.5" /> Saved successfully

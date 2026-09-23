@@ -1,34 +1,45 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Settings, Bell, Shield, Key, Save, Trash2, Copy, Check } from "lucide-react";
+import { Settings, Bell, Shield, Key, Save, Loader2, AlertCircle, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { api, getStoredUser } from "@/lib/api";
 
 type Tab = "General" | "Notifications" | "Security" | "API Keys";
 
 export default function SettingsPage() {
-  const [user, setUser] = useState<{name: string, email: string, org?: string} | null>(null);
+  const [user, setUser] = useState<{ name: string; email: string } | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("General");
-  const [copied, setCopied] = useState(false);
+
+  // Notification email (persisted via the real settings API)
+  const [notificationEmail, setNotificationEmail] = useState("");
+  const [savingEmail, setSavingEmail] = useState(false);
+  const [emailSaved, setEmailSaved] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('agent_faq_user') || localStorage.getItem('user');
-    if (savedUser) {
-      try {
-        const parsed = JSON.parse(savedUser);
-        setUser({
-          name: parsed.username || parsed.name || "",
-          email: parsed.email || "",
-          org: parsed.org || "Agent-FAQ Organization"
-        });
-      } catch (e) {}
-    }
+    // Prefer the user object the login/register flow stored; refresh from /me when possible.
+    setUser(getStoredUser());
+    api.getSettings()
+      .then((s) => {
+        if (s?.notificationEmail) setNotificationEmail(s.notificationEmail);
+      })
+      .catch(() => {});
   }, []);
 
-  const handleCopyApi = () => {
-    navigator.clipboard.writeText("sk_test_1234567890abcdefghijklmnopqrstuvwxyz");
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleSaveNotificationEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmailSaved(false);
+    setEmailError(null);
+    setSavingEmail(true);
+    try {
+      await api.updateSettings({ notificationEmail });
+      setEmailSaved(true);
+    } catch (err: any) {
+      setEmailError(err?.message || "Failed to save notification email");
+    } finally {
+      setSavingEmail(false);
+    }
   };
 
   const tabs = [
@@ -73,81 +84,88 @@ export default function SettingsPage() {
           {activeTab === "General" && (
             <>
               <div className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-6">
-                <h2 className="text-xl font-semibold text-white mb-6">Profile Information</h2>
+                <h2 className="text-xl font-semibold text-white mb-2">Profile Information</h2>
+                <p className="text-sm text-gray-400 mb-6">Your account details, managed through your account.</p>
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-gray-300">Full Name</label>
                       <input 
                         type="text" 
-                        defaultValue={user?.name || ""}
-                        className="w-full rounded-md border border-white/10 bg-black/50 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                        readOnly
+                        value={user?.name || ""}
+                        className="w-full rounded-md border border-white/10 bg-black/50 px-3 py-2 text-sm text-gray-400 cursor-not-allowed focus:outline-none"
                       />
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-gray-300">Email Address</label>
                       <input 
                         type="email" 
-                        defaultValue={user?.email || ""}
-                        className="w-full rounded-md border border-white/10 bg-black/50 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                        readOnly
+                        value={user?.email || ""}
+                        className="w-full rounded-md border border-white/10 bg-black/50 px-3 py-2 text-sm text-gray-400 cursor-not-allowed focus:outline-none"
                       />
                     </div>
                   </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-300">Organization Name</label>
-                    <input 
-                      type="text" 
-                      defaultValue={user?.org || "Agent-FAQ Default"}
-                      className="w-full rounded-md border border-white/10 bg-black/50 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                    />
-                  </div>
-
-                  <div className="pt-4 border-t border-white/10 mt-6 flex justify-end">
-                    <button className="bg-white text-black px-4 py-2 rounded-lg font-medium shadow-lg shadow-white/10 hover:bg-gray-100 transition-all flex items-center gap-2">
-                      <Save className="w-4 h-4" />
-                      Save Changes
-                    </button>
-                  </div>
+                  <p className="text-xs text-gray-500">Email and name are managed by your authentication account.</p>
                 </div>
               </div>
 
               <div className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-6 border-l-4 border-l-red-500/50">
                 <h2 className="text-xl font-semibold text-white mb-2">Danger Zone</h2>
                 <p className="text-sm text-gray-400 mb-6">Irreversible and destructive actions for your account.</p>
-                <button className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-2 rounded-lg font-medium hover:bg-red-500/20 transition-all">
-                  Delete Organization
+                <button 
+                  disabled
+                  title="Not available yet"
+                  className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-2 rounded-lg font-medium cursor-not-allowed"
+                >
+                  Delete Organization (not available yet)
                 </button>
               </div>
             </>
           )}
 
           {activeTab === "Notifications" && (
-            <div className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-6">
+            <form onSubmit={handleSaveNotificationEmail} className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-6">
               <h2 className="text-xl font-semibold text-white mb-6">Notification Preferences</h2>
               <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 border border-white/5 bg-black/20 rounded-lg">
-                  <div>
-                    <h3 className="font-medium text-white">Email Alerts</h3>
-                    <p className="text-sm text-gray-400">Receive alerts when new team members join</p>
-                  </div>
-                  <input type="checkbox" defaultChecked className="w-4 h-4 accent-purple-500 cursor-pointer" />
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-300">Notification Email</label>
+                  <input
+                    type="email"
+                    value={notificationEmail}
+                    onChange={(e) => { setNotificationEmail(e.target.value); setEmailSaved(false); }}
+                    placeholder="alerts@yourorg.com"
+                    className="w-full rounded-md border border-white/10 bg-black/50 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                  />
+                  <p className="text-xs text-gray-500">Used for team-invite and moderation notifications.</p>
                 </div>
-                <div className="flex items-center justify-between p-4 border border-white/5 bg-black/20 rounded-lg">
-                  <div>
-                    <h3 className="font-medium text-white">Weekly Reports</h3>
-                    <p className="text-sm text-gray-400">Get a weekly summary of system analytics</p>
+
+                {emailError && (
+                  <div className="flex items-center gap-2 p-3 text-xs bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{emailError}</span>
                   </div>
-                  <input type="checkbox" defaultChecked className="w-4 h-4 accent-purple-500 cursor-pointer" />
-                </div>
+                )}
+                {emailSaved && (
+                  <div className="flex items-center gap-2 p-3 text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg">
+                    <Check className="w-4 h-4 shrink-0" />
+                    <span>Notification email saved.</span>
+                  </div>
+                )}
+
                 <div className="pt-4 border-t border-white/10 mt-6 flex justify-end">
-                  <button className="bg-white text-black px-4 py-2 rounded-lg font-medium shadow-lg shadow-white/10 hover:bg-gray-100 transition-all flex items-center gap-2">
-                    <Save className="w-4 h-4" />
+                  <button 
+                    type="submit"
+                    disabled={savingEmail}
+                    className="bg-white text-black px-4 py-2 rounded-lg font-medium shadow-lg shadow-white/10 hover:bg-gray-100 transition-all flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {savingEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     Save Preferences
                   </button>
                 </div>
               </div>
-            </div>
+            </form>
           )}
 
           {activeTab === "Security" && (
@@ -155,17 +173,18 @@ export default function SettingsPage() {
               <h2 className="text-xl font-semibold text-white mb-6">Security Settings</h2>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-300">Current Password</label>
-                  <input type="password" placeholder="••••••••" className="w-full rounded-md border border-white/10 bg-black/50 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-300">New Password</label>
-                  <input type="password" placeholder="••••••••" className="w-full rounded-md border border-white/10 bg-black/50 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50" />
+                  <label className="text-sm font-medium text-gray-300">Password</label>
+                  <input type="password" readOnly value="••••••••" className="w-full rounded-md border border-white/10 bg-black/50 px-3 py-2 text-sm text-gray-400 cursor-not-allowed focus:outline-none" />
+                  <p className="text-xs text-gray-500">Password changes are not available in the dashboard yet.</p>
                 </div>
                 <div className="pt-4 border-t border-white/10 mt-6 flex justify-end">
-                  <button className="bg-white text-black px-4 py-2 rounded-lg font-medium shadow-lg shadow-white/10 hover:bg-gray-100 transition-all flex items-center gap-2">
+                  <button 
+                    disabled
+                    title="Not available yet"
+                    className="bg-white/10 text-gray-400 px-4 py-2 rounded-lg font-medium cursor-not-allowed flex items-center gap-2"
+                  >
                     <Shield className="w-4 h-4" />
-                    Update Password
+                    Update Password (soon)
                   </button>
                 </div>
               </div>
@@ -174,33 +193,14 @@ export default function SettingsPage() {
 
           {activeTab === "API Keys" && (
             <div className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-6">
-              <h2 className="text-xl font-semibold text-white mb-6">API Keys</h2>
-              <p className="text-sm text-gray-400 mb-6">Use this key to authenticate with the Agent-FAQ API.</p>
-              
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-300">Production Secret Key</label>
-                  <div className="flex gap-2">
-                    <input 
-                      type="password" 
-                      readOnly 
-                      value="sk_test_1234567890abcdefghijklmnopqrstuvwxyz"
-                      className="w-full rounded-md border border-white/10 bg-black/50 px-3 py-2 text-sm text-gray-400 cursor-not-allowed focus:outline-none"
-                    />
-                    <button 
-                      onClick={handleCopyApi}
-                      className="bg-white/10 hover:bg-white/20 border border-white/10 text-white px-3 py-2 rounded-lg transition-colors flex items-center gap-2"
-                    >
-                      {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="pt-4 border-t border-white/10 mt-6">
-                  <button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-lg font-medium shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 transition-all">
-                    Generate New Key
-                  </button>
-                </div>
+              <h2 className="text-xl font-semibold text-white mb-2">API Keys</h2>
+              <p className="text-sm text-gray-400 mb-6">
+                API access for the bot is authenticated with your account session. Secret management is
+                handled server-side — no secret keys are exposed in this dashboard.
+              </p>
+              <div className="p-4 rounded-lg bg-black/20 border border-white/5 text-sm text-gray-400">
+                Use the Swagger documentation (available in non-production environments) or the documented
+                REST endpoints with your session token to interact with the API programmatically.
               </div>
             </div>
           )}
