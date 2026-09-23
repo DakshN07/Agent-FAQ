@@ -6,9 +6,15 @@ const config = require('../config/env');
 
 const JWT_SECRET = config.jwt.secret;
 const { authenticate } = require('../middleware/auth');
+const { createAuthLimiter } = require('../middleware/authLimiter');
 const validate = require('../middleware/validate');
 const authValidation = require('../validations/auth.validation');
 const redisClient = require('../libs/redis');
+const tokenService = require('../services/tokenService');
+
+// Brute-force protection specifically for credential endpoints.
+const loginLimiter = createAuthLimiter({ max: 10 });
+const passwordLimiter = createAuthLimiter({ max: 5, message: 'Too many password attempts. Please try again in 15 minutes.' });
 
 // GET /api/auth/me
 router.get('/me', authenticate, async (req, res) => {
@@ -93,13 +99,10 @@ router.post('/register', validate(authValidation.register), async (req, res) => 
     const user = new User({ username, email, password });
     await user.save();
 
-    const token = jwt.sign(
-      { id: user._id, role: user.role, email: user.email },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    const { accessToken, refreshToken } = await tokenService.issueSession(user);
+    tokenService.setRefreshCookie(res, refreshToken);
 
-    res.status(201).json({ token, user: { id: user._id, username: user.username, email: user.email } });
+    res.status(201).json({ token: accessToken, user: { id: user._id, username: user.username, email: user.email } });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -132,7 +135,7 @@ router.post('/register', validate(authValidation.register), async (req, res) => 
  *         description: Invalid credentials
  */
 // POST /api/auth/login
-router.post('/login', validate(authValidation.login), async (req, res) => {
+router.post('/login', loginLimiter, validate(authValidation.login), async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -146,13 +149,10 @@ router.post('/login', validate(authValidation.login), async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const token = jwt.sign(
-      { id: user._id, role: user.role, email: user.email },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    const { accessToken, refreshToken } = await tokenService.issueSession(user);
+    tokenService.setRefreshCookie(res, refreshToken);
 
-    res.json({ token, user: { id: user._id, username: user.username, email: user.email } });
+    res.json({ token: accessToken, user: { id: user._id, username: user.username, email: user.email } });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -196,13 +196,74 @@ router.post('/accept-invite', validate(authValidation.acceptInvite), async (req,
     member.status = 'Active';
     await member.save();
 
-    const sessionToken = jwt.sign(
-      { id: user._id, role: user.role, email: user.email },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    const { accessToken, refreshToken } = await tokenService.issueSession(user);
+    tokenService.setRefreshCookie(res, refreshToken);
 
-    res.status(201).json({ token: sessionToken, user: { id: user._id, username: user.username, email: user.email } });
+    res.status(201).json({ token: accessToken, user: { id: user._id, username: user.username, email: user.email } });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/auth/refresh — rotate the refresh token into a fresh access token
+router.post('/refresh', validate(authValidation.refresh), async (req, res) => {
+  try {
+    const refreshToken = tokenService.refreshTokenFromRequest(req);
+    if (!refreshToken) {
+      return res.status(401).json({ error: 'No refresh token provided' });
+    }
+
+    const result = await tokenService.refreshAccessToken(refreshToken);
+    if (!result.ok) {
+      return res.status(401).json({ error: 'Invalid or expired session' });
+    }
+
+    // Rotated refresh token goes back into the httpOnly cookie.
+    tokenService.setRefreshCookie(res, result.refreshToken);
+    res.json({ token: result.accessToken });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/auth/logout — revoke the refresh session and clear the cookie
+router.post('/logout', async (req, res) => {
+  const refreshToken = tokenService.refreshTokenFromRequest(req);
+  if (refreshToken) {
+    await tokenService.revokeSession(refreshToken).catch(() => {});
+  }
+  tokenService.clearRefreshCookie(res);
+  res.json({ message: 'Logged out' });
+});
+
+// PUT /api/auth/password — change password; revokes all refresh sessions
+router.put('/password', authenticate, passwordLimiter, validate(authValidation.changePassword), async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(400).json({ error: 'Current password is incorrect' });
+    }
+
+    if (newPassword === currentPassword) {
+      return res.status(400).json({ error: 'New password must be different from the current password' });
+    }
+
+    user.password = newPassword; // pre-save hook re-hashes
+    await user.save();
+
+    // Invalidate all other devices/sessions; this session's 15-min access
+    // token remains valid until it naturally expires.
+    await tokenService.revokeAllUserSessions(user._id);
+    tokenService.clearRefreshCookie(res);
+
+    res.json({ message: 'Password updated. Please sign in again.' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

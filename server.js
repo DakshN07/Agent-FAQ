@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const mongoose = require('mongoose');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -42,6 +43,7 @@ if (config.env === 'production' && config.corsOrigins.length === 0) {
 }
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '10kb' })); // Prevent large payload attacks
+app.use(cookieParser()); // Parse httpOnly auth cookies (refresh token)
 
 const redisClient = require('./libs/redis');
 

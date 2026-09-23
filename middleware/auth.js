@@ -6,11 +6,19 @@ const EventMember = require('../models/EventMember');
 const JWT_SECRET = config.jwt.secret;
 
 const authenticate = (req, res, next) => {
+  let token = null;
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  }
+  // Server-Sent Events can't set an Authorization header, so accept the
+  // access token via ?token= (short TTL, e.g. 15m — SSE only).
+  if (!token && req.query && typeof req.query.token === 'string' && req.query.token.length) {
+    token = req.query.token;
+  }
+  if (!token) {
     return res.status(401).json({ error: 'No token provided' });
   }
-  const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;

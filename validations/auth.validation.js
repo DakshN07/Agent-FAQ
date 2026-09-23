@@ -22,9 +22,20 @@ const acceptInvite = joi.object({
   password: joi.string().min(8).required(),
 });
 
+const changePassword = joi.object({
+  currentPassword: joi.string().required(),
+  newPassword: joi.string().min(8).required(),
+});
+
+const refresh = joi.object({
+  refreshToken: joi.string().optional(),
+});
+
 module.exports = {
   register,
   login,
   updateMe,
   acceptInvite,
+  changePassword,
+  refresh,
 };

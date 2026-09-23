@@ -1,3 +1,4 @@
+const { EventEmitter } = require('events');
 const Integration = require('../models/Integration');
 const DiscordAdapter = require('../adapters/DiscordAdapter');
 const SlackAdapter = require('../adapters/SlackAdapter');
@@ -11,8 +12,9 @@ const Faq = require('../models/Faq');
 const UnknownQuestion = require('../models/UnknownQuestion');
 const Analytics = require('../models/Analytics');
 
-class IntegrationManager {
+class IntegrationManager extends EventEmitter {
     constructor() {
+        super();
         // Map of active adapters: "eventId:platform" => AdapterInstance
         this.adapters = new Map();
     }
@@ -107,6 +109,11 @@ class IntegrationManager {
                 senderId: userId
             });
 
+            // Notify live (SSE) subscribers about the new/updated conversation
+            // and the incoming user message.
+            this.emit('conversation:upserted', { eventId, platform: sourcePlatform, conversation });
+            this.emit('message:new', { eventId, platform: sourcePlatform, conversationId: conversation._id, message: { text } });
+
             // 2. Resolve the effective answering threshold.
             //    Explicit per-event faqThreshold beats the global setting, which
             //    beats the 0.85 default. The same value is passed into the
@@ -150,6 +157,7 @@ class IntegrationManager {
                 conversation.status = 'Escalated';
             }
             await conversation.save();
+            this.emit('conversation:upserted', { eventId, platform: sourcePlatform, conversation });
 
             // Save AI Message
             if (replyMessage) {
@@ -161,6 +169,9 @@ class IntegrationManager {
                     confidence: finalState.confidenceScore,
                     flags: finalState.isFlagged ? [finalState.toxicityType] : []
                 });
+
+                // Notify live (SSE) subscribers about the AI reply.
+                this.emit('message:new', { eventId, platform: sourcePlatform, conversationId: conversation._id, message: { text: replyMessage, senderType: 'Agent' } });
 
                 // Send back via adapter
                 const adapter = this.getAdapter(eventId, sourcePlatform);
