@@ -18,6 +18,9 @@ describe('Health Check API', () => {
     expect([200, 503]).toContain(res.statusCode);
     expect(res.body).toHaveProperty('status');
     expect(res.body).toHaveProperty('database');
+    // Vector-store diagnostics are reported (ok / uninitialized / error) so a
+    // silent RAG outage is visible in the health payload.
+    expect(res.body).toHaveProperty('vectorDb');
   });
   
   it('should apply rate limiting (if configured without skipping tests)', async () => {

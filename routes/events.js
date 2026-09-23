@@ -6,6 +6,7 @@ const EventMember = require('../models/EventMember');
 const { authenticate } = require('../middleware/auth');
 const { generateOnboardingFAQs, generateEventDescription } = require('../services/ai');
 const { getEmbedding } = require('../services/embedding');
+const { syncFaqVector } = require('../services/vectorStore');
 
 // Generate unique invite code helper
 const generateInviteCode = async () => {
@@ -52,27 +53,20 @@ router.post('/', authenticate, async (req, res) => {
         // Auto save generated FAQs with embeddings for instant bot matching
         if (generatedPrompts && generatedPrompts.length > 0) {
             for (const p of generatedPrompts) {
-                try {
-                    const embedding = await getEmbedding(p.question);
-                    const faq = new Faq({
-                        eventId: newEvent._id,
-                        question: p.question,
-                        answer: p.answer,
-                        platforms: ['discord', 'slack', 'telegram'],
-                        embedding: embedding || []
-                    });
-                    await faq.save();
-                } catch (embErr) {
-                    // Still save FAQ even if embedding fails
-                    const faq = new Faq({
-                        eventId: newEvent._id,
-                        question: p.question,
-                        answer: p.answer,
-                        platforms: ['discord', 'slack', 'telegram'],
-                        embedding: []
-                    });
-                    await faq.save();
-                }
+                // Still save the FAQ even if embedding generation fails.
+                const embedding = await getEmbedding(p.question).catch(() => null);
+                const faq = new Faq({
+                    eventId: newEvent._id,
+                    question: p.question,
+                    answer: p.answer,
+                    platforms: ['discord', 'slack', 'telegram'],
+                    embedding: embedding || []
+                });
+                await faq.save();
+
+                // Sync to the vector store so the FAQ is immediately searchable.
+                // Non-throwing: failures are logged loudly, never fatal.
+                await syncFaqVector(faq);
             }
         }
 

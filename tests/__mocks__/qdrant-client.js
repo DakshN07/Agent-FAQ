@@ -15,6 +15,9 @@ class QdrantClient {
   async createCollection() {
     return true;
   }
+  async count() {
+    return { count: 0 };
+  }
 }
 
 module.exports = { QdrantClient };

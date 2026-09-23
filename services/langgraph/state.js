@@ -14,6 +14,9 @@ const StateChannels = {
   platform: null,
   sentiment: null,
   
+  // Per-event answering threshold (event faqThreshold ?? global settings)
+  faqThreshold: null,
+  
   // Routing & execution flags
   nextAgent: null,
   isFlagged: false,

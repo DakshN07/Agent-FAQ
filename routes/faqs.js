@@ -3,6 +3,7 @@ const router = express.Router();
 const Faq = require('../models/Faq');
 const Event = require('../models/Event');
 const { getEmbedding } = require('../services/embedding');
+const { syncFaqVector, deleteFaq } = require('../services/vectorStore');
 const { authenticate, authorizeEvent } = require('../middleware/auth');
 
 // All FAQ routes require authentication.
@@ -78,6 +79,12 @@ router.post('/', authorizeEvent(), async (req, res, next) => {
             embedding: embedding || undefined,
         });
         await newFaq.save();
+
+        // Keep the vector store in sync so the FAQ is immediately searchable.
+        // Non-throwing: if no embedding was produced (or Qdrant is down) the
+        // keyword/legacy path still works and the failure is logged loudly.
+        await syncFaqVector(newFaq);
+
         res.status(201).json(newFaq);
     } catch (error) {
         next(error);
@@ -100,6 +107,18 @@ router.put('/:id', authorizeFaq, async (req, res, next) => {
         }
 
         const updatedFaq = await Faq.findByIdAndUpdate(req.faq._id, updateData, { new: true });
+
+        // Re-sync the vector point (upsert overwrites by the deterministic UUID).
+        // When a new question was supplied but its embedding failed to generate,
+        // remove the stale point rather than leaving a mismatched vector behind.
+        if (question) {
+            if (updateData.embedding) {
+                await syncFaqVector(updatedFaq);
+            } else {
+                await deleteFaq(updatedFaq._id);
+            }
+        }
+
         res.json(updatedFaq);
     } catch (error) {
         next(error);
@@ -109,7 +128,10 @@ router.put('/:id', authorizeFaq, async (req, res, next) => {
 // DELETE FAQ
 router.delete('/:id', authorizeFaq, async (req, res, next) => {
     try {
-        await Faq.findByIdAndDelete(req.faq._id);
+        const faqId = req.faq._id;
+        await Faq.findByIdAndDelete(faqId);
+        // Best-effort removal from the vector store (non-throwing, logged).
+        await deleteFaq(faqId);
         res.json({ message: 'FAQ deleted successfully' });
     } catch (error) {
         next(error);

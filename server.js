@@ -116,12 +116,18 @@ if (swaggerEnabled) {
 }
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
   const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+  // Vector-store health is non-fatal for the health check itself (we don't
+  // want hosting providers restarting the service on a Qdrant outage), but it
+  // IS reported so the outage is visible instead of silently degrading the bot.
+  const { getHealth } = require('./services/vectorStore');
+  const vectorDb = await getHealth();
+  const body = { status: dbStatus === 'connected' ? 'ok' : 'error', database: dbStatus, uptime: process.uptime(), vectorDb };
   if (dbStatus !== 'connected') {
-    return res.status(503).json({ status: 'error', database: dbStatus, uptime: process.uptime() });
+    return res.status(503).json(body);
   }
-  res.status(200).json({ status: 'ok', database: dbStatus, uptime: process.uptime() });
+  res.status(200).json(body);
 });
 
 app.get('/', (req, res) => {

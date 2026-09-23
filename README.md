@@ -70,7 +70,9 @@ The application is production-ready for live deployment. The frontend is a moder
 - AI Suggestions review (approve/reject AI-generated answers)
 - Omnichannel adapters for Discord, Slack, and Telegram
 - Security hardening: helmet, rate limiting, JWT auth, CORS lockdown, Sentry, graceful shutdown
-- Tests: backend health & auth suites
+- Answer-threshold resolution (per-event `faqThreshold` → global settings → 0.85) honored by the LangGraph agent and conversation status
+- Vector-store reliability: single shared Qdrant wrapper, auto-created collection, deterministic point IDs, loud logging + Sentry capture on RAG failures, FAQ CRUD syncs to the vector store, `/health` reports vector-DB status
+- Tests: backend health, auth, invite, threshold & vector-store suites
 
 **Known limitations / roadmap:**
 - Manual (human) replies inside the Inbox are not yet wired to a backend endpoint — messages flow through the connected channel bots automatically.
@@ -262,7 +264,7 @@ POST   /api/ai/ask           # Ask the AI FAQ agent a question
 
 ### **System**
 ```http
-GET    /health               # Health check
+GET    /health               # Health check (DB + vector-DB status)
 GET    /api/health           # API health check
 GET    /api-docs             # Swagger API docs (disabled in production)
 ```
@@ -389,6 +391,21 @@ CORS_ORIGINS=https://your-frontend.vercel.app
 
 ### **Environment Variables**
 All required environment variables are validated at boot by `config/env.js`. The service will refuse to start if `MONGO_URI`, `JWT_SECRET`, or `MISTRAL_API_KEY` are missing, or if `JWT_SECRET` uses the insecure default placeholder in production.
+
+### **Semantic search (Qdrant / vector store)**
+- The `faqs` Qdrant collection is **auto-created** with the correct vector dimensions on the first upsert — no manual collection setup needed.
+- Point IDs are deterministic UUIDs derived from the FAQ MongoDB id, so re-learning or editing a FAQ updates the same point instead of duplicating it.
+- Creating/editing/deleting FAQs through the API (and the onboarding generator) keeps the vector store in sync automatically.
+- RAG failures are **loud**: failed embeddings or Qdrant calls are logged at error level and captured by Sentry, so a misconfigured vector store is never mistaken for a genuine "no match".
+- `/health` includes a `vectorDb` struct (`ok` / `uninitialized` / `error`) so outages are visible in uptime monitoring.
+
+### **Answer threshold resolution**
+The confidence threshold used for auto-answering resolves in this order, replacing the previously hardcoded `0.85`:
+1. Per-event `Event.faqThreshold` (when explicitly set),
+2. Global `Settings.similarityThreshold` (the admin Settings UI),
+3. `0.85` default.
+
+The same resolved threshold drives both the LangGraph agent's RAG decision and the conversation's Answered/Escalated status.
 
 ---
 

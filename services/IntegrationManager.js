@@ -2,8 +2,11 @@ const Integration = require('../models/Integration');
 const DiscordAdapter = require('../adapters/DiscordAdapter');
 const SlackAdapter = require('../adapters/SlackAdapter');
 const TelegramAdapter = require('../adapters/TelegramAdapter');
+const Event = require('../models/Event');
 const { getEmbedding } = require('../services/embedding');
 const { cosineSimilarity } = require('../services/similarity');
+const { normalizeThreshold } = require('../utils/threshold');
+const { getSettings } = require('../utils/storage');
 const Faq = require('../models/Faq');
 const UnknownQuestion = require('../models/UnknownQuestion');
 const Analytics = require('../models/Analytics');
@@ -104,7 +107,18 @@ class IntegrationManager {
                 senderId: userId
             });
 
-            // 2. Invoke LangGraph Workflow
+            // 2. Resolve the effective answering threshold.
+            //    Explicit per-event faqThreshold beats the global setting, which
+            //    beats the 0.85 default. The same value is passed into the
+            //    workflow AND used for the Answered/Escalated decision so the
+            //    configurable setting is never ignored.
+            const [event, settings] = await Promise.all([
+                Event.findById(eventId).lean().catch(() => null),
+                getSettings().catch(() => null),
+            ]);
+            const faqThreshold = normalizeThreshold(event?.faqThreshold ?? settings?.similarityThreshold);
+
+            // 3. Invoke LangGraph Workflow
             const { createSupportWorkflow } = require('./langgraph/workflow');
             const workflow = createSupportWorkflow();
 
@@ -117,19 +131,20 @@ class IntegrationManager {
                 nextAgent: null,
                 isFlagged: false,
                 confidenceScore: 0.0,
-                finalAnswer: null
+                finalAnswer: null,
+                faqThreshold
             };
 
             const finalState = await workflow.invoke(initialState);
 
-            // 3. Handle Workflow Result
+            // 4. Handle Workflow Result
             let replyMessage = finalState.finalAnswer;
             
             if (finalState.isFlagged) {
                 // Do not respond, or respond neutrally
                 replyMessage = "I cannot process this request.";
                 conversation.status = 'Spam';
-            } else if (finalState.confidenceScore >= 0.85) {
+            } else if (finalState.confidenceScore >= faqThreshold) {
                 conversation.status = 'Answered';
             } else {
                 conversation.status = 'Escalated';
@@ -154,7 +169,7 @@ class IntegrationManager {
                 }
             }
 
-            return { matched: finalState.confidenceScore >= 0.85, answer: replyMessage };
+            return { matched: finalState.confidenceScore >= faqThreshold, answer: replyMessage };
 
         } catch (err) {
             console.error("Error in LangGraph unified message handler:", err);
