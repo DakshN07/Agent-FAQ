@@ -69,12 +69,15 @@ router.post('/:id/answer', async (req, res, next) => {
 
     // 2. Create FAQ using Learning Agent
     const { runLearningAgent } = require('../services/langgraph/agents/learning');
+    const { resolveMistralKey } = require('../services/mistralKey');
+    const { key: mistralApiKey } = await resolveMistralKey({ userId: req.user?.id });
     await runLearningAgent(
       unknown.eventId,
       unknown.text,
       answer,
       unknown.sourcePlatform,
-      req.user ? req.user.id : null
+      req.user ? req.user.id : null,
+      mistralApiKey
     );
 
     // 3. Delete UnknownQuestion

@@ -12,8 +12,10 @@ describe('Session lifecycle (access/refresh tokens)', () => {
 
   beforeAll(async () => {
     try {
+      // Deliberately NOT process.env.MONGO_URI: that points at the development
+      // database, and the dropDatabase() below would delete real user data.
       await mongoose.connect(
-        process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/agent-faq-test'
+        process.env.TEST_MONGO_URI || 'mongodb://127.0.0.1:27017/agent-faq-test'
       );
       connected = true;
       await mongoose.connection.db.dropDatabase();

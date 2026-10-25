@@ -12,9 +12,14 @@ Given the Question and Answer, provide a JSON response with exactly two fields:
   "tags": ["tag1", "tag2", "tag3"]
 }`;
 
-async function runLearningAgent(eventId, question, answer, sourcePlatform, adminId) {
+async function runLearningAgent(eventId, question, answer, sourcePlatform, adminId, apiKey) {
   try {
-    const model = new ChatMistralAI({ temperature: 0, modelName: "mistral-large-latest", responseFormat: { type: "json_object" } });
+    const model = new ChatMistralAI({
+      temperature: 0,
+      modelName: "mistral-large-latest",
+      responseFormat: { type: "json_object" },
+      ...(apiKey ? { apiKey } : {}),
+    });
     
     // 1. Generate Metadata using LLM
     const response = await model.invoke([
@@ -30,7 +35,7 @@ async function runLearningAgent(eventId, question, answer, sourcePlatform, admin
     }
 
     // 2. Generate Embedding
-    const embedding = await getEmbedding(question);
+    const embedding = await getEmbedding(question, { apiKey });
 
     // 3. Save to MongoDB
     const newFaq = new Faq({

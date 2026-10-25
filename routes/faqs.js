@@ -5,6 +5,7 @@ const Event = require('../models/Event');
 const { getEmbedding } = require('../services/embedding');
 const { syncFaqVector, deleteFaq } = require('../services/vectorStore');
 const { authenticate, authorizeEvent } = require('../middleware/auth');
+const { resolveMistralKey } = require('../services/mistralKey');
 
 // All FAQ routes require authentication.
 router.use(authenticate);
@@ -54,7 +55,11 @@ const authorizeFaq = async (req, res, next) => {
 // GET all FAQs for an event
 router.get('/', authorizeEvent(), async (req, res, next) => {
     try {
-        const faqs = await Faq.find({ eventId: req.event._id }).sort({ _id: -1 });
+        // `embedding` is a ~1024-float array per FAQ; the dashboard only ever
+        // renders question/answer, so omit it to keep list payloads small.
+        const faqs = await Faq.find({ eventId: req.event._id })
+            .select('-embedding')
+            .sort({ _id: -1 });
         res.json(faqs);
     } catch (error) {
         next(error);
@@ -69,7 +74,10 @@ router.post('/', authorizeEvent(), async (req, res, next) => {
             return res.status(400).json({ error: 'question and answer are required' });
         }
 
-        const embedding = await getEmbedding(question);
+        // Bill embeddings to the requesting user's own Mistral key when they
+        // supplied one.
+        const { key: mistralApiKey } = await resolveMistralKey({ userId: req.user.id });
+        const embedding = await getEmbedding(question, { apiKey: mistralApiKey || undefined });
 
         const newFaq = new Faq({
             eventId: req.event._id,
@@ -102,7 +110,8 @@ router.put('/:id', authorizeFaq, async (req, res, next) => {
         if (platforms !== undefined) updateData.platforms = platforms;
 
         if (question) {
-            const embedding = await getEmbedding(question);
+            const { key: mistralApiKey } = await resolveMistralKey({ userId: req.user.id });
+            const embedding = await getEmbedding(question, { apiKey: mistralApiKey || undefined });
             if (embedding) updateData.embedding = embedding;
         }
 

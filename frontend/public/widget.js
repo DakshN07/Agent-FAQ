@@ -1,8 +1,20 @@
 (function() {
     // Agent-FAQ Embeddable Web Widget
-    const scriptTag = document.currentScript;
+    const scriptTag = document.currentScript || document.querySelector('script[data-event-id]');
+    if (!scriptTag) {
+        console.error('Agent-FAQ: Script tag with data-event-id not found');
+        return;
+    }
     const eventId = scriptTag.getAttribute('data-event-id');
-    const apiHost = scriptTag.getAttribute('data-api-host') || 'http://localhost:3000';
+    // Auto-detect host from script source or attribute, defaulting to current host or port 4000
+    let defaultHost = 'http://localhost:4000';
+    try {
+        if (scriptTag.src) {
+            const url = new URL(scriptTag.src);
+            defaultHost = `${url.protocol}//${url.host}`;
+        }
+    } catch (_) {}
+    const apiHost = scriptTag.getAttribute('data-api-host') || defaultHost;
     
     if (!eventId) {
         console.error('Agent-FAQ: Missing data-event-id on script tag');

@@ -42,7 +42,16 @@ if (config.env === 'production' && config.corsOrigins.length === 0) {
   logger.warn('⚠️  CORS_ORIGINS is not set in production; all cross-origin browser requests will be blocked.');
 }
 app.use(cors(corsOptions));
-app.use(express.json({ limit: '10kb' })); // Prevent large payload attacks
+app.use(
+  express.json({
+    limit: '10kb', // Prevent large payload attacks
+    // Keep the raw bytes so Slack's signature check (which signs the exact
+    // serialized body) can be verified after parsing. See routes/webhooks.js.
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 app.use(cookieParser()); // Parse httpOnly auth cookies (refresh token)
 
 const redisClient = require('./libs/redis');
@@ -120,12 +129,34 @@ if (swaggerEnabled) {
 // Health check endpoint
 app.get('/health', async (req, res) => {
   const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+
   // Vector-store health is non-fatal for the health check itself (we don't
   // want hosting providers restarting the service on a Qdrant outage), but it
   // IS reported so the outage is visible instead of silently degrading the bot.
   const { getHealth } = require('./services/vectorStore');
   const vectorDb = await getHealth();
-  const body = { status: dbStatus === 'connected' ? 'ok' : 'error', database: dbStatus, uptime: process.uptime(), vectorDb };
+
+  // Report which AI key would be used, WITHOUT revealing any key material.
+  // This is what makes "the AI doesn't work" diagnosable from a browser.
+  const { envKey } = require('./services/mistralKey');
+  const hasEnvKey = Boolean(envKey());
+
+  const body = {
+    status: dbStatus === 'connected' ? 'ok' : 'error',
+    database: dbStatus,
+    uptime: process.uptime(),
+    env: config.env,
+    // 'user' keys are per-account and checked at request time, so here we can
+    // only report whether a shared fallback exists.
+    ai: {
+      mistralKeyConfigured: hasEnvKey,
+      note: hasEnvKey
+        ? 'Shared MISTRAL_API_KEY is set. Users can still use their own key.'
+        : 'No shared MISTRAL_API_KEY. Users must add their own from the dashboard.',
+    },
+    vectorDb,
+  };
+
   if (dbStatus !== 'connected') {
     return res.status(503).json(body);
   }

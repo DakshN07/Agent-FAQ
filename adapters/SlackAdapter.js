@@ -1,25 +1,39 @@
 const axios = require('axios');
 const BaseAdapter = require('./BaseAdapter');
+const logger = require('../utils/logger');
 
+/**
+ * Slack adapter.
+ *
+ * Slack is webhook-driven for *inbound* messages (the Events API pushes to us)
+ * and token-driven for *outbound* (chat.postMessage). The webhook receiver in
+ * routes/webhooks.js authenticates the request with the signing secret and then
+ * hands the payload to parseWebhook(); replies go back out through the bot token
+ * obtained at connection time.
+ */
 class SlackAdapter extends BaseAdapter {
-    constructor(eventId, config, credentials) {
+    constructor(eventId, config, credentials, onMessageReceive) {
         super(eventId, config, credentials);
-        // credentials.token usually refers to Bot User OAuth Token (xoxb-...)
+        // credentials.token is the Bot User OAuth Token (xoxb-...)
+        this.onMessageReceive = onMessageReceive;
     }
 
     async init() {
-        console.log(`[Event ${this.eventId}] Slack integration initialized (Webhook listener ready).`);
-        // State-less initialization for Slack since it's webhook-driven, mostly just validating the token.
+        // Validate the token immediately. A revoked token should surface as a
+        // clear error at connection time, not as silence in a channel later.
         try {
             const res = await axios.post('https://slack.com/api/auth.test', {}, {
-                headers: { Authorization: `Bearer ${this.credentials.token}` }
+                headers: { Authorization: `Bearer ${this.credentials.token}` },
+                timeout: 10000,
             });
             if (!res.data.ok) {
-                throw new Error(`Slack Auth Error: ${res.data.error}`);
+                throw new Error(`Slack auth failed: ${res.data.error}`);
             }
-            console.log(`[Event ${this.eventId}] Slack Bot authenticated successfully as ${res.data.bot_id}`);
+            logger.info?.(`[Event ${this.eventId}] Slack connected as ${res.data.user || res.data.team}`);
         } catch (error) {
-            console.error(`[Event ${this.eventId}] Failed to init Slack config:`, error.message);
+            // Re-throw: the caller records this as lastError so the dashboard can
+            // tell the user their token is no longer valid.
+            throw error;
         }
     }
 
@@ -32,7 +46,8 @@ class SlackAdapter extends BaseAdapter {
                 headers: {
                     Authorization: `Bearer ${this.credentials.token}`,
                     'Content-Type': 'application/json'
-                }
+                },
+                timeout: 10000,
             });
             if (!response.data.ok) {
                 console.error(`[Event ${this.eventId}] Slack send error: ${response.data.error}`);
@@ -48,8 +63,9 @@ class SlackAdapter extends BaseAdapter {
             return { type: 'challenge', challenge: payload.challenge }; // For Slack setup
         }
 
-        // Check if it's a message event
-        if (payload.event && payload.event.type === 'message' && !payload.event.bot_id) {
+        // Ignore anything that isn't an inbound user message: bot echoes,
+        // edits, deletions, joins, and our own replies (which have bot_id).
+        if (payload.event && payload.event.type === 'message' && !payload.event.bot_id && !payload.event.subtype) {
             return {
                 eventId: this.eventId,
                 sourcePlatform: 'slack',

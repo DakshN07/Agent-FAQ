@@ -10,7 +10,11 @@ Raw Data:
 ${data}`;
 
 async function analyticsNode(state) {
-  const model = new ChatMistralAI({ temperature: 0, modelName: "mistral-large-latest" });
+  const model = new ChatMistralAI({
+    temperature: 0,
+    modelName: "mistral-large-latest",
+    ...(state.mistralApiKey ? { apiKey: state.mistralApiKey } : {}),
+  });
   const messages = state.messages;
   const lastMessage = messages[messages.length - 1];
 

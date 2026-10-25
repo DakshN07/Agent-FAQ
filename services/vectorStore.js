@@ -17,7 +17,17 @@ const COLLECTION = 'faqs';
 let client = null;
 function getClient() {
   if (!client) {
-    client = new QdrantClient({ url: process.env.QDRANT_URL || 'http://localhost:6333' });
+    // QDRANT_API_KEY is needed for Qdrant Cloud; harmless against a local
+    // instance that has auth disabled.
+    const apiKey = process.env.QDRANT_API_KEY || undefined;
+    client = new QdrantClient({
+      url: process.env.QDRANT_URL || 'http://localhost:6333',
+      ...(apiKey && { apiKey }),
+    });
+    logger.info(
+      `[vectorStore] Using Qdrant at ${process.env.QDRANT_URL || 'http://localhost:6333'}` +
+      `${apiKey ? ' (authenticated)' : ''}`
+    );
   }
   return client;
 }
@@ -51,8 +61,19 @@ async function ensureCollection(dimension) {
  */
 async function searchSimilar(eventId, vector, limit = 3) {
   assertVector(vector);
+
+  // Fail fast with a useful message instead of hanging on a dead endpoint.
+  // getClient().search against an unreachable Qdrant can otherwise stall the
+  // request for the full fetch timeout, which reads to the user as "the bot is
+  // thinking" rather than "the vector store is down".
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  const { signal } = controller;
+
   try {
     return await getClient().search(COLLECTION, {
+      timeout: 8000,
+      signal,
       vector,
       limit,
       filter: {
@@ -60,9 +81,18 @@ async function searchSimilar(eventId, vector, limit = 3) {
       },
     });
   } catch (err) {
-    logger.error(`[vectorStore] Qdrant search failed for event ${eventId}: ${err.message}`);
+    const hint =
+      err.name === 'AbortError'
+        ? 'Qdrant did not respond within 8s'
+        : err.message;
+    logger.error(
+      `[vectorStore] Qdrant search failed for event ${eventId}: ${hint}. ` +
+      'Is Qdrant running and is QDRANT_URL correct?'
+    );
     Sentry.captureException(err);
     throw err;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -153,13 +183,18 @@ async function deleteFaq(id) {
  * outage is visible without bringing the whole health check down.
  */
 async function getHealth() {
+  const started = Date.now();
   try {
-    const { collections } = await getClient().getCollections();
+    const { collections } = await getClient().getCollections({ timeout: 5000 });
     const faqCol = collections.find((c) => c.name === COLLECTION);
     const info = {
       status: faqCol ? 'ok' : 'uninitialized',
       collection: COLLECTION,
       exists: Boolean(faqCol),
+      // Which key/URL is in play, so a misconfigured QDRANT_URL is obvious from
+      // the health payload alone instead of requiring log diving.
+      url: process.env.QDRANT_URL || 'http://localhost:6333',
+      latencyMs: Date.now() - started,
     };
     if (faqCol) {
       if (faqCol.vectors) info.vectorSize = faqCol.vectors.size || faqCol.vectors.params?.size || null;
@@ -173,7 +208,18 @@ async function getHealth() {
     return info;
   } catch (err) {
     logger.error(`[vectorStore] Health check failed: ${err.message}`);
-    return { status: 'error', collection: COLLECTION, exists: false, message: err.message };
+    return {
+      status: 'error',
+      collection: COLLECTION,
+      exists: false,
+      url: process.env.QDRANT_URL || 'http://localhost:6333',
+      latencyMs: Date.now() - started,
+      // Tell the operator exactly what to do — this is the single most common
+      // misconfiguration when running locally.
+      message:
+        `${err.message}. Start it with "docker compose up -d qdrant" ` +
+        'or set QDRANT_URL to a reachable Qdrant instance.',
+    };
   }
 }
 

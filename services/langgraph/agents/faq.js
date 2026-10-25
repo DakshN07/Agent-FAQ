@@ -30,7 +30,7 @@ async function faqNode(state) {
 
   try {
     // 1. Get embedding for the user's query
-    const queryEmbedding = await getEmbedding(query);
+    const queryEmbedding = await getEmbedding(query, { apiKey: state.mistralApiKey });
     if (!queryEmbedding) {
       // Loud failure: missing/misconfigured MISTRAL_API_KEY etc. Log & capture
       // so it is distinguishable from a genuine "no match".
@@ -64,7 +64,11 @@ async function faqNode(state) {
         .map((r) => `Q: ${r.payload.question}\nA: ${r.payload.answer}`)
         .join('\n\n');
 
-      const model = new ChatMistralAI({ temperature: 0, modelName: 'mistral-large-latest' });
+      const model = new ChatMistralAI({
+        temperature: 0,
+        modelName: 'mistral-large-latest',
+        ...(state.mistralApiKey ? { apiKey: state.mistralApiKey } : {}),
+      });
       const response = await model.invoke([
         new SystemMessage(faqPrompt(contextText)),
         new HumanMessage(query),

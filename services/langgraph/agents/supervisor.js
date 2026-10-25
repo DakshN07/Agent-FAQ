@@ -10,8 +10,12 @@ The available agents are:
 Return ONLY the name of the next agent to route to. Do not include any other text.`;
 
 async function supervisorNode(state) {
-  const model = new ChatMistralAI({ temperature: 0, modelName: "mistral-large-latest" });
-  
+  const model = new ChatMistralAI({
+    temperature: 0,
+    modelName: "mistral-large-latest",
+    ...(state.mistralApiKey ? { apiKey: state.mistralApiKey } : {}),
+  });
+
   const messages = state.messages;
   const lastMessage = messages[messages.length - 1];
   

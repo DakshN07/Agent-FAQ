@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Settings, Bell, Shield, Key, Save, Loader2, AlertCircle, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, getStoredUser } from "@/lib/api";
+import MistralKeyStep from "@/components/MistralKeyStep";
 
 type Tab = "General" | "Notifications" | "Security" | "API Keys";
 
@@ -249,14 +250,21 @@ export default function SettingsPage() {
 
           {activeTab === "API Keys" && (
             <div className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-6">
-              <h2 className="text-xl font-semibold text-white mb-2">API Keys</h2>
+              <h2 className="text-xl font-semibold text-white mb-2">AI &amp; API Keys</h2>
               <p className="text-sm text-gray-400 mb-6">
-                API access for the bot is authenticated with your account session. Secret management is
-                handled server-side — no secret keys are exposed in this dashboard.
+                Agent-FAQ needs a Mistral API key to understand and match questions. Bring your own
+                key so usage is billed to your account, not the server operator's.
               </p>
-              <div className="p-4 rounded-lg bg-black/20 border border-white/5 text-sm text-gray-400">
-                Use the Swagger documentation (available in non-production environments) or the documented
-                REST endpoints with your session token to interact with the API programmatically.
+
+              <MistralKeyStep skippable={false} />
+
+              <div className="mt-8 pt-6 border-t border-white/10">
+                <h3 className="text-sm font-medium text-gray-300 mb-2">Programmatic access</h3>
+                <p className="text-sm text-gray-400">
+                  API access is authenticated with your account session. Use the Swagger docs
+                  (available in non-production environments) or the documented REST endpoints with
+                  your session token.
+                </p>
               </div>
             </div>
           )}

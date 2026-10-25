@@ -46,7 +46,13 @@ class DiscordAdapter extends BaseAdapter {
                 }
             });
 
-            const botToken = process.env.DISCORD_TOKEN || this.credentials.token;
+            // The bot token comes from the connection made in the dashboard, not
+            // from a global env var. Using this.credentials first is what makes
+            // per-event connections work at all.
+            const botToken = this.credentials?.token || process.env.DISCORD_TOKEN;
+            if (!botToken) {
+                throw new Error('No Discord bot token available for this connection');
+            }
             await this.client.login(botToken);
         } catch (err) {
             console.error(`[Event ${this.eventId}] Failed to init Discord config: ${err.message}`);

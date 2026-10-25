@@ -1,530 +1,603 @@
-#  FAQ Agent — Smart Omnichannel FAQ Bot
+# FAQ Agent — AI Support Bot
 
-> **A full-stack FAQ management system with AI-powered semantic matching, built with Next.js, Node.js, and MongoDB. (Includes integrations for Discord, Slack, and Telegram)**
+An AI assistant that answers your users' questions automatically.
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=flat&logo=vercel)](https://vercel.com)
-[![Backend on Render](https://img.shields.io/badge/Backend%20on-Render-00ADD8?style=flat&logo=render)](https://render.com)
-[![Database on MongoDB Atlas](https://img.shields.io/badge/Database-MongoDB%20Atlas-47A248?style=flat&logo=mongodb)](https://www.mongodb.com/atlas)
-
-## 📋 Table of Contents
-
-- [ Features](#-features)
-- [ Current Status & Remaining Work](#-current-status--remaining-work)
-- [ Tech Stack](#️-tech-stack)
-- [ Project Structure](#-project-structure)
-- [ Live Demo](#-live-demo)
-- [ Quick Start](#-quick-start)
-- [ Screenshots](#-screenshots)
-- [ API Endpoints](#-api-endpoints)
-- [ Database Schema](#-database-schema)
-- [ Deployment](#-deployment)
-- [ Contributing](#-contributing)
-- [ License](#-license)
-- [ Authors](#-authors)
+You give it a list of FAQs. It reads each incoming question, figures out the *meaning* (not just the keywords), and replies with the right answer — on **Discord**, **Slack**, **Telegram**, or your own website.
 
 ---
 
-##  Features
+## Table of contents
 
-###  **Omnichannel Support**
-- **Multiple Platforms**: Native adapters for Discord, Slack, and Telegram.
-- **Unified Management**: Manage FAQs for all platforms from a single dashboard.
-
-###  **AI-Powered FAQ Matching**
-- **Semantic Similarity**: Uses embeddings to understand user intent
-- **Smart Matching**: Finds relevant FAQs even with different wording
-- **Configurable Threshold**: Adjustable similarity matching (0.1-1.0)
-
-###  **Analytics Dashboard**
-- **Real-time Statistics**: Total FAQs, unanswered questions, accuracy rates
-- **Activity Tracking**: Monitor bot performance and user interactions
-- **Visual Charts**: Beautiful graphs showing usage patterns
-
-###  **Admin Management**
-- **FAQ Management**: Add, edit, delete FAQs with rich text editor
-- **Settings Configuration**: Customize bot behavior and appearance
-- **User Management**: Team collaboration with role-based access
-
-###  **Self-Learning System**
-- **Unknown Question Tracking**: Automatically saves questions that don't match
-- **AI Suggestions**: Generates suggested answers for frequent questions
-- **Admin Training**: Notifies admins when questions are asked 3+ times
-
-###  **Security & Authentication**
-- **JWT Authentication**: Secure login system
-- **Role-based Access**: Admin and member permissions
-- **Team Invitations**: Secure team member onboarding
+- [What it does](#what-it-does)
+- [Quick start](#quick-start)
+- [What you need to install](#what-you-need-to-install)
+- [Step 1 — Start the database services](#step-1--start-the-database-services)
+- [Step 2 — Configure the backend](#step-2--configure-the-backend)
+- [Step 3 — Start the backend](#step-3--start-the-backend)
+- [Step 4 — Start the frontend](#step-4--start-the-frontend)
+- [Step 5 — Get your AI key](#step-5--get-your-ai-key)
+- [Understanding the ports](#understanding-the-ports)
+- [How the AI actually answers](#how-the-ai-actually-answers)
+- [Troubleshooting](#troubleshooting)
+- [Deploying](#deploying)
+- [Project layout](#project-layout)
+- [API reference](#api-reference)
 
 ---
 
-## 🚧 Current Status
+## What it does
 
-The application is production-ready for live deployment. The frontend is a modern Next.js (App Router) application (`frontend`), backed by the Node.js/Express API (`server.js`).
-
-**Implemented Features:**
-- Authentication (Login / Register / Team Invitations)
-- Dashboard with Overview, Inbox, AI Agent console, Knowledge (FAQ) management
-- Events, Integrations, Team, and Moderation views
-- Analytics dashboard (query volume, resolution rates, platform distribution)
-- Settings configuration (similarity threshold, auto-response, notifications)
-- AI Suggestions review (approve/reject AI-generated answers)
-- Omnichannel adapters for Discord, Slack, and Telegram
-- Security hardening: helmet, rate limiting, JWT auth, CORS lockdown, Sentry, graceful shutdown
-- Session security: short-lived access tokens (15 min, in-memory on the frontend) + refresh sessions stored hashed in Redis, rotated on every use with replay rejection, delivered via an httpOnly cookie; password change and logout revoke sessions; brute-force limiters on login/register/password
-- Live inbox: Server-Sent Events stream (`GET /api/events/:eventId/conversations/stream`) pushes new messages/conversations to the dashboard in real time
-- Manual (human) replies: `POST /api/events/:eventId/conversations/:id/reply` sends through the connected channel bot
-- Pagination on conversations and message endpoints (`?page=&limit=`, returns `{ data, total, page, totalPages }`)
-- AI console answers run through the **same LangGraph workflow** as the channel bots (moderation → supervisor → FAQ/analytics with RAG) — no more answer divergence between channels and the dashboard
-- Frontend observability: Sentry (client bootstrap + error boundaries on the root layout and dashboard)
-- Answer-threshold resolution (per-event `faqThreshold` → global settings → 0.85) honored by the LangGraph agent and conversation status
-- Vector-store reliability: single shared Qdrant wrapper, auto-created collection, deterministic point IDs, loud logging + Sentry capture on RAG failures, FAQ CRUD syncs to the vector store, `/health` reports vector-DB status
-- Tests: backend health, auth, invite, session lifecycle (refresh rotation, logout, password change), threshold & vector-store suites
-
-**Known limitations / roadmap:**
-- Web-widget chat manual replies: conversations from the built-in web widget have no persistent channel transport yet, so `reply` returns a clear 409 until a web transport is added — Discord/Slack/Telegram replies work now.
-- Cross-site refresh cookies (`SameSite=None; Secure`) work in Chrome/Firefox/Edge; Safari's ITP can block cross-site cookies, so users on Safari may need to sign in again after their refresh cookie expires.
-- No public read-only API keys / billing yet (post-launch SaaS roadmap).
+- **Semantic matching** — a user asking "how do I reset my pwd?" matches an FAQ titled "Password reset". No keyword lists.
+- **Answers from your FAQs only** — if nothing matches closely enough, it says so instead of inventing an answer.
+- **Live inbox** — new questions arrive in the dashboard in real time, and you can reply as a human.
+- **Unanswered questions get collected** — anything the bot can't answer is saved so you know what to write an FAQ for next.
+- **Moderation** — spam and abuse are filtered before your users reach a real person.
 
 ---
 
-##  Tech Stack
+## Quick start
 
-### **Frontend (Next.js)**
--  **Next.js 15 (App Router)** — Modern React framework
--  **Tailwind CSS v4** — Utility-first styling
--  **TypeScript** — Type safety
--  **Framer Motion** — Fluid animations
--  **Lucide React** — Beautiful iconography
-
-### **Backend**
--  **Node.js** — JavaScript runtime
--  **Express.js** — Web framework
--  **JWT** — Authentication
--  **Nodemailer** — Email notifications
--  **OpenAI/Gemini** — AI embeddings
-
-### **Database**
--  **MongoDB Atlas** — Cloud database
--  **Mongoose** — ODM for MongoDB
--  **MongoDB Driver** — Database connectivity
-
-### **Deployment**
--  **Vercel** — Frontend hosting
--  **Render** — Backend hosting
--  **MongoDB Atlas** — Database hosting
-
----
-
-##  Project Structure
-
-```text
-Agent-FAQ/
-├── 📁 adapters/               # Integration adapters (Discord, Slack, Telegram)
-├── 📁 config/                 # Environment and app configuration
-├── 📁 frontend/               # Next.js frontend application (Active)
-├── 📁 models/                 # Database models (Mongoose)
-├── 📁 routes/                 # Express API routes
-├── 📁 services/               # Core business logic (IntegrationManager, AI)
-├── 📁 middleware/             # Express middlewares (auth, error handling)
-├── 📁 validations/            # Request validation schemas (Joi)
-├── 📁 utils/                  # Utility functions (logger, email)
-├── server.js                  # Main Express server file
-├── package.json               # Backend dependencies
-└── README.md                  # This file
-```
-
----
-
-## 🌐 Live Demo
-
-### **Frontend (Dashboard)**
-```
-[http://agent-faq.vercel.app](https://agent-faq-seven.vercel.app/dashboard)
-```
-
-### **Backend API**
-```
-https://agent-faq.onrender.com
-```
----
-
-##  Quick Start
-
-### **Prerequisites**
-- Node.js 18+ installed
-- MongoDB Atlas account
-- GitHub account
-- Vercel account (free)
-- Render account (free)
-
-### **1. Clone the Repository**
 ```bash
 git clone https://github.com/DakshN07/Agent-FAQ.git
 cd Agent-FAQ
+
+npm install                # backend
+cd frontend && npm install && cd ..   # frontend
+
+cp .env.example .env       # then edit it (see Step 2)
+cp frontend/.env.example frontend/.env.local
+
+docker compose up -d       # starts MongoDB, Qdrant, Redis
+
+npm run dev                          # terminal 1 — API on :4000
+cd frontend && npm run dev           # terminal 2 — UI on :3000
 ```
 
-### **2. Install Dependencies**
+Open **http://localhost:3000**, create an account, and paste your AI key when asked.
+
+---
+
+## What you need to install
+
+| Tool | Version | Why |
+|------|---------|-----|
+| [Node.js](https://nodejs.org) | 18 or newer | Runs the backend and frontend |
+| [Docker Desktop](https://www.docker.com/products/docker-desktop/) | any | Runs MongoDB, Qdrant, Redis — saves you installing three databases by hand |
+| A [Mistral](https://mistral.ai) account | free tier | The AI that answers questions. You get a free API key. |
+
+You also need Docker's memory to be at least 2 GB (Docker Desktop → Settings → Resources).
+
+---
+
+## Step 1 — Start the database services
+
+The app needs three supporting services. `docker compose` starts all of them at once:
+
 ```bash
-# Install backend dependencies
-npm install
-
-# Install frontend dependencies
-cd frontend
-npm install
-cd ..
+docker compose up -d
 ```
 
-### **3. Environment Setup**
-Create a `.env` file in the root directory:
-```env
-# Database
-MONGO_URI=your_mongodb_atlas_connection_string
+That starts:
 
-# Authentication
-JWT_SECRET=your_super_secret_jwt_key
+| Service | Port | What it's for |
+|---------|------|----------------|
+| **MongoDB** | 27017 | Stores your FAQs, users, conversations |
+| **Qdrant** | 6333 | Stores FAQ "meanings" so the AI can match questions |
+| **Redis** | 6379 | Keeps you signed in across server restarts (optional) |
 
-# AI Services (MISTRAL_API_KEY is required for boot)
-MISTRAL_API_KEY=your_mistral_api_key
+> **Redis is genuinely optional.** If you skip it, sessions live in memory and you just have to log in again whenever the server restarts. Qdrant is **not** optional — without it the AI cannot match answers.
 
-# Optional AI providers
-GEMINI_API_KEY=your_gemini_api_key
-OPENAI_API_KEY=your_openai_api_key
+To start only what you need:
 
-# Redis (optional, for rate-limit stores)
-REDIS_URL=
-
-# CORS origins (comma-separated, required in production)
-CORS_ORIGINS=
-
-# Frontend base URL (for invite links and emails)
-FRONTEND_URL=http://localhost:3000
-
-# Discord Bot (optional)
-DISCORD_TOKEN=your_discord_bot_token
-
-# Email (optional)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your_email@gmail.com
-SMTP_PASS=your_app_password
-SMTP_FROM=your_email@gmail.com
-```
-
-Then create a `.env.local` in `frontend/`:
-```env
-NEXT_PUBLIC_API_URL=http://localhost:3000
-```
-
-### **4. Run Locally**
 ```bash
-# Start backend server
-npm run dev
+docker compose up -d mongo qdrant    # skip Redis
+```
 
-# Start frontend (in another terminal)
+Check they're healthy:
+
+```bash
+docker compose ps
+```
+
+### Using a hosted Qdrant instead of Docker
+
+Qdrant Cloud has a free tier with 1 GB — plenty for thousands of FAQs.
+
+1. Create a free cluster at [qdrant.tech](https://qdrant.tech)
+2. Copy the cluster URL and API key
+3. Put them in `.env`:
+
+```env
+QDRANT_URL=https://your-cluster.cloud.qdrant.io:6333
+QDRANT_API_KEY=your_api_key
+```
+
+You do **not** need to create a collection — Agent-FAQ creates the `faqs` collection automatically the first time it saves a FAQ.
+
+---
+
+## Step 2 — Configure the backend
+
+Copy the example file and open it:
+
+```bash
+cp .env.example .env
+```
+
+For local development you only need to change one thing:
+
+```env
+JWT_SECRET=<paste any long random string>
+```
+
+Generate one with:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+```
+
+Everything else already has a working default. The full list, with what each one is for:
+
+| Variable | Required? | What it does |
+|----------|-----------|--------------|
+| `MONGO_URI` | **yes** | Where your data lives. Defaults to local MongoDB. |
+| `JWT_SECRET` | **yes** | Signs your login sessions. Use a long random string. |
+| `PORT` | no | Which port the API listens on. Defaults to `4000`. |
+| `CORS_ORIGINS` | in production | Which website may call the API. Set to your frontend's URL. |
+| `FRONTEND_URL` | no | Used to build links in invite emails. |
+| `QDRANT_URL` | no | Where Qdrant is. Defaults to `http://localhost:6333`. |
+| `REDIS_URL` | no | Shared session store. Leave blank locally. |
+| `MISTRAL_API_KEY` | no | Shared AI key. **You usually don't need this** — see Step 5. |
+| `GEMINI_API_KEY` | no | Only used to auto-write starter FAQs. Optional. |
+| `SENTRY_DSN` | no | Error tracking. Optional. |
+| `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` | no | Lets users connect a Discord server with one click. See "Connecting channels". |
+| `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET` | no | Same, for a Slack workspace. |
+| `SLACK_SIGNING_SECRET` | no | **Required** for Slack to deliver messages. Without it Slack requests are rejected. |
+| `TELEGRAM_BOT_TOKEN` | no | Fallback bot token. Not needed when users connect their own. |
+
+The server refuses to start if `MONGO_URI` or `JWT_SECRET` is missing, and will refuse a known placeholder `JWT_SECRET` in production.
+
+---
+
+## Step 3 — Start the backend
+
+```bash
+npm run dev
+```
+
+You should see:
+
+```
+info: 🚀 API Server running in development mode on port 4000
+info: ✅ MongoDB Connected to mongodb://localhost:27017/agentfaq
+```
+
+Verify it works:
+
+```bash
+curl http://localhost:4000/health
+```
+
+A healthy response looks like this:
+
+```json
+{
+  "status": "ok",
+  "database": "connected",
+  "ai": {
+    "mistralKeyConfigured": false,
+    "note": "No shared MISTRAL_API_KEY. Users must add their own from the dashboard."
+  },
+  "vectorDb": { "status": "uninitialized", "exists": false, "latencyMs": 12 }
+}
+```
+
+- `vectorDb.status: "uninitialized"` is **fine** at this point — it just means no FAQ has been saved yet. The collection is created on the first save.
+- `vectorDb.status: "error"` means Qdrant isn't reachable. See [Troubleshooting](#troubleshooting).
+
+---
+
+## Step 4 — Start the frontend
+
+In a **second terminal**:
+
+```bash
 cd frontend
 npm run dev
 ```
 
-### **5. Access the Application**
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:3000/api
+Open **http://localhost:3000** and create your account.
+
+### The frontend config file
+
+```bash
+cp .env.example .env.local
+```
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:4000
+```
+
+`NEXT_PUBLIC_API_URL` must point at the **backend** port, not the frontend port.
 
 ---
 
-## 🔧 API Endpoints
+## Step 5 — Get your AI key
 
-### **Authentication**
-```http
-POST /api/auth/register        # Register a new admin user
-POST /api/auth/login           # User login
-POST /api/auth/accept-invite   # Accept team invitation
-GET  /api/auth/me              # Get current user
-```
+This is the step that switches the AI from off to on.
 
-### **Events**
-```http
-GET    /api/events             # List events for current user
-POST   /api/events             # Create an event
-POST   /api/events/join        # Join an event via invite code
-```
+### Why you need one
 
-### **FAQ Management** (`/api/events/:eventId/faqs`)
-```http
-GET    /api/faqs             # Get all FAQs
-POST   /api/faqs             # Create new FAQ
-PUT    /api/faqs/:id         # Update FAQ
-DELETE /api/faqs/:id         # Delete FAQ
-```
+The AI matches questions to FAQs by converting both into a numeric "meaning" (an *embedding*). That requires an AI model, which requires an API key. Rather than requiring the server operator to supply one, Agent-FAQ uses **your own key** — so usage is billed to you, and you can revoke it anytime.
 
-### **Analytics & Settings**
-```http
-GET    /api/analytics        # Get analytics data
-GET    /api/settings         # Get app settings
-PUT    /api/settings         # Update settings
-GET    /api/suggestions      # Get AI suggestions
-GET    /api/unknown-questions # Get unknown questions
-```
+Mistral's free tier is more than enough to evaluate this project.
 
-### **AI Agent**
-```http
-GET    /api/ai/ask?question=...&eventId=...   # Ask the AI agent (runs the same LangGraph pipeline as the bots)
-```
+### Getting it
 
-### **Conversations (paginated)**
-```http
-GET    /api/events/:eventId/conversations?status=&page=&limit=  # List conversations
-GET    /api/events/:eventId/conversations/stream?token=         # SSE live stream (inbox)
-GET    /api/events/:eventId/conversations/:id/messages?page=&limit=  # Thread messages
-POST   /api/events/:eventId/conversations/:id/reply             # Manual (human) reply via channel bot
-```
+1. Sign up at [mistral.ai](https://mistral.ai)
+2. Go to the [API keys page](https://console.mistral.ai/api-keys)
+3. Click **Create new key**, give it any name, copy it
 
-### **Session / Auth**
-```http
-POST   /api/auth/refresh     # Rotate refresh token (httpOnly cookie) -> new access token
-POST   /api/auth/logout      # Revoke refresh session + clear cookie
-PUT    /api/auth/password    # Change password (revokes all refresh sessions)
-```
+### Adding it
 
-### **System**
-```http
-GET    /health               # Health check (DB + vector-DB status)
-GET    /api/health           # API health check
-GET    /api-docs             # Swagger API docs (disabled in production)
-```
+When you create your account, the app walks you straight to a **"Connect your AI"** step with a box to paste it in. If you skipped it, go to **Settings → API Keys** any time.
+
+When you paste a key, the server **verifies it against Mistral before saving it**. If the key is wrong you get an error immediately instead of silent failures later.
+
+### How your key is handled
+
+- Verified live against Mistral, then encrypted with **AES-256-GCM** before being stored
+- Marked `select: false` in the database, so it can't leak into an ordinary query
+- **Never sent back to the browser** — not even masked-and-returned
+- Decrypted only at the moment of an API call
+
+### Don't want to manage a key per user?
+
+Leave `MISTRAL_API_KEY` in `.env` and every user shares it. Handy for demos and small teams.
 
 ---
 
-##  Database Schema
+## Connecting channels (Discord, Slack, Telegram)
 
-### **User Model**
-```javascript
-{
-  email: String,           // User email
-  password: String,        // Hashed password
-  name: String,           // User name
-  role: String,           // 'admin' | 'member'
-  createdAt: Date
-}
+This is the **Integrations** page in the dashboard. A user clicks **Connect**, approves
+the provider's own screen, and lands back on your site with the button showing *Connected*.
+
+```
+Dashboard                Your API                  Discord / Slack          Back to your site
+   │                        │                             │                        │
+   │ POST /api/oauth/       │                             │                        │
+   │   :platform/connect    │                             │                        │
+   │───────────────────────►│                             │                        │
+   │  { authorizeUrl }      │                             │                        │
+   │◄───────────────────────│                             │                        │
+   │                                                                │                        │
+   │  browser goes straight to the provider ─────────────────────► │                        │
+   │                                                  user picks server/workspace        │
+   │                                                  and approves permissions          │
+   │                                                                │                        │
+   │  ◄──────────────────────────────────────────────────────────────┤                        │
+   │      GET /api/oauth/:platform/callback?code=…&state=…           │                        │
+   │                        │  verify state, swap code for a token,   │                        │
+   │                        │  store it encrypted, start the bot     │                        │
+   │  ◄─────────────────────────────────────────────────────────     │                        │
+   │      302 → /dashboard/integrations?connected=discord           │                        │
 ```
 
-### **FAQ Model**
-```javascript
-{
-  question: String,        // FAQ question
-  answer: String,         // FAQ answer
-  guildId: String,        // Discord server ID
-  embedding: [Number],    // AI embedding vector
-  createdAt: Date
-}
-```
+Only **one** redirect, straight to the provider. Nothing is copied around by hand.
 
-### **Settings Model**
-```javascript
-{
-  similarityThreshold: Number,  // Matching threshold (0.1-1.0)
-  maxSuggestions: Number,       // Max AI suggestions
-  autoRespond: Boolean,         // Auto-response setting
-  notificationEmail: String,    // Admin email
-  createdAt: Date,
-  updatedAt: Date
-}
-```
+### What each platform asks for
+
+| Platform | Scopes requested | Why |
+|----------|------------------|-----|
+| Discord | View channel, Send messages, Read history | The minimum to read a question and reply to it. **Not** Administrator. |
+| Slack | `chat:write`, `chat:write.public`, `channels:history`, `channels:read` | Needed to read messages and post replies. |
+| Telegram | *(none — you paste a token)* | Telegram has no bot OAuth at all. |
+
+### Telegram works differently, and it has to
+
+Telegram simply does not offer an OAuth screen for bots. The flow is:
+
+1. The user messages **@BotFather** and creates a bot.
+2. They paste the token into a dialog.
+3. We verify the token against Telegram *before* saving it.
+
+Step 3 matters — without it a typo gets saved and produces a bot that looks connected
+but never replies.
+
+### Setting up Discord
+
+1. Go to the [Discord Developer Portal](https://discord.com/developers/applications) → **New Application**.
+2. **OAuth2** → **URL Redirect** → paste `https://your-api.com/api/oauth/discord/callback`.
+3. Copy the **Client ID** and **Client Secret** into `.env` as `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET`.
+
+### Setting up Slack
+
+1. Go to [api.slack.com/apps](https://api.slack.com/apps) → **New App From Scratch** → pick a workspace.
+2. **OAuth & Permissions** → **Bot Token Scopes** → add the four scopes above.
+3. **Event Subscriptions** → enable, and subscribe to `message.channels` and `message.groups`.
+4. Copy the **Client ID** and **Client Secret** into `.env` as `SLACK_CLIENT_ID` / `SLACK_CLIENT_SECRET`.
+5. Copy the **Signing Secret** into `.env` as `SLACK_SIGNING_SECRET`. **Slack won't deliver
+   messages without this** — the backend rejects unsigned requests rather than trusting them.
+
+### Importing FAQs you already wrote
+
+Once a channel is connected, **Import FAQs** pulls in questions you've already answered
+there. A *pinned message with a reply* becomes one FAQ: the pin is the question, the first
+reply is the answer. That matches how people already use pins, so it's predictable.
+
+**Telegram can't do this.** The Telegram Bot API gives bots no access to chat history —
+there is nothing to read. The app says so rather than offering a button that can't work.
 
 ---
 
-## Deployment
+## Understanding the ports
 
-### **Frontend Deployment (Vercel)**
+Two servers run at once, so they use different ports:
 
-1. **Connect to Vercel**
-   - Go to [vercel.com](https://vercel.com)
-   - Sign in with GitHub
-   - Click "New Project"
+| Port | What's on it | Start it with |
+|------|--------------|---------------|
+| **3000** | The website you look at | `cd frontend && npm run dev` |
+| **4000** | The API the website talks to | `npm run dev` |
 
-2. **Import Repository**
-   - Select your `Agent-FAQ` repository
-   - Set root directory to `frontend/`
-   - Vercel auto-detects the Next.js framework (see `frontend/vercel.json`)
+Running both on 3000 is the single most common setup mistake — the second one fails to start, and the first ends up calling itself. If you change one port, change it in three places:
 
-3. **Configure Environment Variables**
-   - Set `NEXT_PUBLIC_API_URL` to your deployed backend URL (e.g. `https://agent-faq.onrender.com`)
+| What | Where |
+|------|-------|
+| API port | `PORT` in `.env` |
+| Where the website looks for the API | `NEXT_PUBLIC_API_URL` in `frontend/.env.local` |
+| Who may call the API | `CORS_ORIGINS` in `.env` (set this to the **frontend** URL) |
 
-4. **Deploy**
-   - Click "Deploy"
-   - Get your live URL
+---
 
-### **Backend Deployment (Render)**
+## How the AI actually answers
 
-A `render.yaml` blueprint is included. Alternatively:
+When a question arrives, it passes through four agents in sequence:
 
-1. **Create Web Service**
-   - Go to [render.com](https://render.com)
-   - Click "New Web Service"
-   - Connect your GitHub repo
+1. **Moderation** — is this spam, abuse, or a scam? Flags it and stops.
+2. **Supervisor** — route it to the right specialist.
+3. **FAQ agent** — turn the question into a vector, search Qdrant for the closest FAQs, and answer using only what it found. If the best match is below your similarity threshold, it declines instead of guessing.
+4. **Analytics agent** — for admin questions about usage.
 
-2. **Configure Settings**
-   - **Root Directory**: `/` (leave blank)
-   - **Build Command**: `npm install`
-   - **Start Command**: `node server.js`
-   - **Environment**: Node
+**Your similarity threshold** is how confident the match must be. It's set per event, falls back to the global setting, and defaults to `0.85`. Higher means the bot only answers when it's very sure — fewer wrong answers, more escalations. Lower means it answers more, but may stretch.
 
-3. **Environment Variables**
-   ```env
-   # Required
-   NODE_ENV=production
-   MONGO_URI=your_mongodb_atlas_connection
-   JWT_SECRET=your_strong_random_secret
-   MISTRAL_API_KEY=your_mistral_key
-   # Recommended
-   CORS_ORIGINS=https://your-frontend.vercel.app
-   FRONTEND_URL=https://your-frontend.vercel.app
+A question the bot can't confidently answer gets saved to **Unknown Questions** so you can turn it into a real FAQ.
+
+---
+
+## Troubleshooting
+
+### `vectorDb.status: "error"` / "fetch failed"
+
+Qdrant isn't running.
+
+```bash
+docker compose up -d qdrant
+docker compose ps          # confirm it's up
+```
+
+Still failing? Check `QDRANT_URL` in `.env` matches what Qdrant reports at `http://localhost:6333`.
+
+### The AI answers everything with "I couldn't find a verified answer"
+
+The bot found no FAQ above your threshold. In order of likelihood:
+
+1. **No AI key saved** — check Settings → API Keys.
+2. **Qdrant is down**, so there are no vectors to search. Check `/health`.
+3. **Your FAQs have no embeddings** — this happens if they were imported before an AI key existed. Regenerate them:
+
+   ```bash
+   node scripts/backfill-embeddings.js
    ```
 
-4. **Deploy**
-   - Click "Create Web Service"
-   - Wait for build completion
+4. **Your threshold is too high** — lower it in Settings.
 
-### **Database Setup (MongoDB Atlas)**
+### `Port 4000 is already in use`
 
-1. **Create Cluster**
-   - Go to [mongodb.com/atlas](https://www.mongodb.com/atlas)
-   - Create free cluster (M0)
+Something else is on that port:
 
-2. **Database Access**
-   - Create database user
-   - Set username/password
+```bash
+# Windows
+netstat -ano | findstr :4000
+# macOS / Linux
+lsof -i :4000
+```
 
-3. **Network Access**
-   - Allow access from anywhere (0.0.0.0/0)
+Or change `PORT` in `.env` and update the two other places listed above.
 
-4. **Get Connection String**
-   - Click "Connect" on cluster
-   - Choose "Connect your application"
-   - Copy connection string
+### `MongooseServerSelectionError`
+
+MongoDB isn't running or `MONGO_URI` is wrong.
+
+```bash
+docker compose up -d mongo
+```
+
+### The website loads but every request fails
+
+Almost always `NEXT_PUBLIC_API_URL`. Check `frontend/.env.local` points at the **API** port (4000 locally). Restart Next.js after changing it — env vars are read at startup.
+
+### Creating an event is slow or hangs
+
+Starter FAQ generation calls an AI provider. It now runs in the background and no longer blocks, but if it's very slow the provider key is probably missing. It works fine without one.
 
 ---
 
-##  Configuration
+## Deploying
 
-### **CORS Setup**
-In production the backend only allows origins listed in `CORS_ORIGINS` (comma-separated). Set it to your frontend URL:
+### Frontend → Vercel
+
+1. Push to GitHub, then import the repo at [vercel.com](https://vercel.com)
+2. Set **Root Directory** to `frontend`
+3. Add `NEXT_PUBLIC_API_URL=https://your-api.onrender.com`
+
+### Backend → Render
+
+A [`render.yaml`](./render.yaml) blueprint is included. Otherwise create a Web Service with:
+
+| Setting | Value |
+|---------|-------|
+| Build command | `npm install` |
+| Start command | `node server.js` |
+
+Environment variables:
+
 ```env
+NODE_ENV=production
+MONGO_URI=<your MongoDB Atlas URI>
+JWT_SECRET=<64+ random characters>
 CORS_ORIGINS=https://your-frontend.vercel.app
+FRONTEND_URL=https://your-frontend.vercel.app
+QDRANT_URL=<your Qdrant URL>
+QDRANT_API_KEY=<your Qdrant key>
+REDIS_URL=<your Redis URL>
 ```
 
-### **Environment Variables**
-All required environment variables are validated at boot by `config/env.js`. The service will refuse to start if `MONGO_URI`, `JWT_SECRET`, or `MISTRAL_API_KEY` are missing, or if `JWT_SECRET` uses the insecure default placeholder in production.
+> Set `CORS_ORIGINS` to your **frontend** URL. This is the most common production misconfiguration, and it presents as "every API call fails in the browser but works in curl".
 
-### **Semantic search (Qdrant / vector store)**
-- The `faqs` Qdrant collection is **auto-created** with the correct vector dimensions on the first upsert — no manual collection setup needed.
-- Point IDs are deterministic UUIDs derived from the FAQ MongoDB id, so re-learning or editing a FAQ updates the same point instead of duplicating it.
-- Creating/editing/deleting FAQs through the API (and the onboarding generator) keeps the vector store in sync automatically.
-- RAG failures are **loud**: failed embeddings or Qdrant calls are logged at error level and captured by Sentry, so a misconfigured vector store is never mistaken for a genuine "no match".
-- `/health` includes a `vectorDb` struct (`ok` / `uninitialized` / `error`) so outages are visible in uptime monitoring.
+### Everything with Docker
 
-### **Answer threshold resolution**
-The confidence threshold used for auto-answering resolves in this order, replacing the previously hardcoded `0.85`:
-1. Per-event `Event.faqThreshold` (when explicitly set),
-2. Global `Settings.similarityThreshold` (the admin Settings UI),
-3. `0.85` default.
+```bash
+docker compose up -d --build
+```
 
-The same resolved threshold drives both the LangGraph agent's RAG decision and the conversation's Answered/Escalated status.
+The website is then on **http://localhost**.
 
 ---
 
-##  Contributing
+## Project layout
 
-We welcome contributions! Here's how to get started:
+```
+Agent-FAQ/
+├── adapters/          Channel bots (Discord, Slack, Telegram)
+├── config/            Environment validation, Swagger
+├── frontend/          Next.js dashboard
+├── libs/              Shared clients (DB, Redis, sessions)
+├── middleware/        Auth, validation, error handling
+├── models/            MongoDB schemas
+├── routes/            API endpoints
+├── services/
+│   ├── langgraph/     The four AI agents
+│   ├── ai.js          Starter FAQ generation
+│   ├── embedding.js   Question → vector
+│   ├── mistralKey.js  Per-user AI key handling
+│   └── vectorStore.js Qdrant wrapper
+├── utils/             Logger, crypto, helpers
+├── server.js          API entry point
+└── tests/             Test suite
+```
 
-1. **Fork the repository**
-2. **Create a feature branch**
-   ```bash
-   git checkout -b feature/amazing-feature
-   ```
-3. **Make your changes**
-4. **Commit your changes**
-   ```bash
-   git commit -m 'Add amazing feature'
-   ```
-5. **Push to the branch**
-   ```bash
-   git push origin feature/amazing-feature
-   ```
-6. **Open a Pull Request**
+---
 
-### **Development Guidelines**
-- Follow the existing code style
-- Add tests for new features
-- Update documentation
-- Ensure all tests pass
+## API reference
+
+Interactive docs are at **http://localhost:4000/api-docs** (disabled in production).
+
+### Health
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/health` | Database, AI-key, and vector-store status |
+
+### Authentication
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/api/auth/register` | Create an account |
+| POST | `/api/auth/login` | Sign in |
+| POST | `/api/auth/logout` | Sign out |
+| POST | `/api/auth/refresh` | Rotate the session token |
+| GET | `/api/auth/me` | Current user |
+| PUT | `/api/auth/password` | Change password |
+| POST | `/api/auth/accept-invite` | Join a team |
+| GET | `/api/auth/mistral-key` | Is an AI key configured? |
+| PUT | `/api/auth/mistral-key` | Save an AI key (verified first) |
+| DELETE | `/api/auth/mistral-key` | Remove the AI key |
+
+### Events
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/events` | Your events |
+| POST | `/api/events` | Create an event |
+| GET | `/api/events/:id` | One event |
+| POST | `/api/events/join` | Join with an invite code |
+
+### Channel integrations
+
+> Connecting uses a browser redirect, so `eventId` goes in the **body** — not the path.
+> Only status reads are nested under the event.
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/api/oauth/:platform/connect` | Start a connection. Returns `{ authorizeUrl }` |
+| GET | `/api/oauth/:platform/callback` | Where the provider sends the user back |
+| GET | `/api/oauth/:platform/status` | Is this platform configured on the server? |
+| POST | `/api/oauth/telegram/connect` | Save a Telegram bot token |
+| POST | `/api/oauth/telegram/verify` | Check a token before saving it |
+| DELETE | `/api/oauth/:platform/disconnect` | Disconnect and delete stored credentials |
+| GET | `/api/events/:id/integrations` | Connection state per platform (no tokens) |
+| POST | `/api/events/:id/integrations/:platform/reconnect` | Retry a connection that failed |
+| GET | `/api/events/:id/integrations/:platform/import-sources` | Channels available to import from |
+| POST | `/api/events/:id/integrations/:platform/import-faqs` | Import pinned Q&A as FAQs |
+
+`:platform` is `discord`, `slack`, or `telegram`. Import endpoints only work for Discord
+and Slack.
+
+### FAQs
+
+> FAQs live under `/api/faqs` and are scoped by an `eventId` — **not** nested under `/api/events/:id/faqs`.
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/faqs?eventId=...` | List an event's FAQs |
+| POST | `/api/faqs` | Create a FAQ |
+| PUT | `/api/faqs/:id` | Update a FAQ |
+| DELETE | `/api/faqs/:id` | Delete a FAQ |
+
+### Conversations
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/events/:eventId/conversations` | List conversations (paginated) |
+| GET | `/api/events/:eventId/conversations/stream` | Live updates (SSE) |
+| GET | `/api/events/:eventId/conversations/:id/messages` | Read a thread |
+| POST | `/api/events/:eventId/conversations/:id/reply` | Reply as a human |
+
+### AI
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/ai/ask?question=...&eventId=...` | Ask the assistant |
+| GET | `/api/analytics?eventId=...` | Usage statistics |
+| GET | `/api/unknown-questions?eventId=...` | Questions the bot couldn't answer |
+| GET | `/api/settings` · PUT `/api/settings` | Read and update settings |
+
+---
+
+## Scripts
+
+| Command | Purpose |
+|---------|---------|
+| `npm run dev` | Start the API |
+| `npm run build:frontend` | Build the dashboard for production |
+| `npm test` | Run the test suite |
+| `node scripts/backfill-embeddings.js` | Regenerate embeddings for existing FAQs |
+| `docker compose up -d` | Start MongoDB, Qdrant, Redis |
+
+---
+
+## Known limitations
+
+- **Web-widget replies** — the bot answers on your website, but human replies from the dashboard are only supported for Discord, Slack, and Telegram. The web widget returns a clear 409 until a transport is added.
+- **Telegram FAQ import** — Telegram bots get no access to chat history through the Bot API, so there is nothing to import. Add Telegram FAQs by hand.
+- **Telegram needs a token, not a click** — unlike Discord and Slack, Telegram offers no bot OAuth screen, so connecting it means pasting a token from @BotFather. This is a Telegram limitation, not a design choice.
+- **Safari and session cookies** — cross-site refresh cookies can be blocked by Safari's ITP. Chrome, Firefox, and Edge are unaffected. Affected users just sign in again.
+- **Single-process OAuth state** — the one-time connection tokens are held in memory, so a server restart mid-connection (or running more than one API instance) invalidates a flow already in progress. Users just click Connect again.
 
 ---
 
 ## License
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+MIT — see [LICENSE](./LICENSE).
 
-```
-MIT License
-
-Copyright (c) 2025 DakshN07
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
----
-
-## 👥 Authors
-
-[![GitHub: DakshN07](https://img.shields.io/badge/GitHub-DakshN07-181717?style=flat&logo=github)](https://github.com/DakshN07)
-[![GitHub: AyushBurde](https://img.shields.io/badge/GitHub-AyushBurde-181717?style=flat&logo=github)](https://github.com/AyushBurde)
-
-- **[Daksh Nayak](https://github.com/DakshN07)** - *Frontend development, database & deployment*
-- **[Ayush Burde](https://github.com/AyushBurde)** - *Main project concept, backend & architecture*
-
----
-
-##  Acknowledgments
-
-- **OpenAI** for AI embeddings and suggestions
-- **Google Gemini** for alternative AI services
-- **Vercel** for frontend hosting
-- **Render** for backend hosting
-- **MongoDB Atlas** for database hosting
-- **Discord.js** for Discord bot integration
-
----
-
-##  Support
-
-If you need help or have questions:
-
--  **Email**: [dakshnayak635@gmail.com] [aayuworks7@gmail.com]
--  **Issues**: [GitHub Issues](https://github.com/DakshN07/Agent-FAQ/issues)
--  **Discussions**: [GitHub Discussions](https://github.com/DakshN07/Agent-FAQ/discussions)
-
----
-
-<div align="center">
-
-** Star this repository if you found it helpful!**
-
-** Built with ❤️ for the developer community**
-
-</div>
+Built by [Daksh Nayak](https://github.com/DakshN07) and [Ayush Burde](https://github.com/AyushBurde).

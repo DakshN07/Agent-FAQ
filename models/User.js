@@ -14,6 +14,23 @@ const UserSchema = new mongoose.Schema({
     webId: { type: String, default: null } // anonymous session ID
   },
   spamScore: { type: Number, default: 0 },
+
+  // Bring-your-own Mistral API key, encrypted at rest (AES-256-GCM via
+  // utils/crypto). We only ever store the ciphertext bundle — never plaintext.
+  // `select: false` keeps it out of every incidental query result so a stray
+  // `.find()` can never leak it into an API response.
+  mistralApiKey: {
+    type: {
+      ciphertext: { type: String },
+      iv: { type: String },
+      tag: { type: String },
+    },
+    default: null,
+    select: false,
+  },
+  // Set when the key last passed a live verification against Mistral.
+  mistralKeyVerifiedAt: { type: Date, default: null },
+
   createdAt: { type: Date, default: Date.now },
 });
 

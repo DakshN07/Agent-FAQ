@@ -1,6 +1,10 @@
 // Centralized API Client for Agent-FAQ
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+// Must match the backend port (4000 locally — see ../.env). This fallback only
+// applies if .env.local is missing; keeping it on 4000 means the frontend
+// still reaches the API instead of accidentally calling the Next.js dev server
+// on port 3000.
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 // --------------------------------------------------------------------------
 // Token handling
@@ -13,6 +17,27 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 // --------------------------------------------------------------------------
 export const USER_KEY = 'agent_faq_user';
 export const EVENT_KEY = 'agent_faq_active_event';
+
+/**
+ * Connection state for one channel, as returned by
+ * `GET /api/events/:id/integrations`. Mirrors
+ * `services/integrationCredentials.toPublicJSON`.
+ *
+ * Note the deliberate absence of any credential field: the backend never
+ * serialises bot tokens into an API response.
+ */
+export type IntegrationState = {
+  /** Credentials are stored. */
+  connected: boolean;
+  /** The adapter's socket is actually open — `connected && !running` means the
+   *  connection was saved but the bot is not answering. */
+  running: boolean;
+  /** Display name of the server/workspace/bot, when known. */
+  label?: string | null;
+  connectedAt?: string;
+  lastError?: string | null;
+  runtimeError?: string | null;
+};
 
 let accessToken: string | null = null;
 let refreshPromise: Promise<boolean> | null = null;
@@ -185,6 +210,28 @@ export const api = {
     return data;
   },
 
+  // Mistral API key (bring-your-own-key)
+  /** Whether AI is usable: 'user' = your own key, 'env' = shared key, 'none' = not configured. */
+  async getMistralKeyStatus() {
+    return apiRequest<{ configured: boolean; source: 'user' | 'env' | 'none'; verifiedAt: string | null }>(
+      '/api/auth/mistral-key'
+    );
+  },
+
+  /** Verifies the key against Mistral server-side, then stores it encrypted. */
+  async saveMistralKey(apiKey: string) {
+    return apiRequest<{ message: string; source: string; verifiedAt: string }>('/api/auth/mistral-key', {
+      method: 'PUT',
+      body: JSON.stringify({ apiKey }),
+    });
+  },
+
+  async removeMistralKey() {
+    return apiRequest<{ message: string }>('/api/auth/mistral-key', {
+      method: 'DELETE',
+    });
+  },
+
   /** Changes the password; clears the session (server revokes all refresh sessions). */
   async changePassword(body: { currentPassword: string; newPassword: string }) {
     return apiRequest<{ message: string }>('/api/auth/password', {
@@ -332,15 +379,99 @@ export const api = {
     return `${API_BASE_URL}/api/events/${encodeURIComponent(eventId)}/conversations/stream?token=${encodeURIComponent(token)}`;
   },
 
-  // Integrations
-  async getIntegrations(eventId: string) {
-    return apiRequest<any[]>(`/api/events/${eventId}/integrations`);
+  // --------------------------------------------------------------------------
+  // Channel integrations (Discord / Slack / Telegram)
+  //
+  // Connections are established by redirecting the browser to the provider, so
+  // there is no "save credentials" call — the backend performs the OAuth
+  // round-trip and stores the tokens itself.
+  // --------------------------------------------------------------------------
+
+  /** Per-platform connection state, keyed by platform. Never includes tokens. */
+  async getIntegrationStatus(eventId: string) {
+    return apiRequest<Record<string, IntegrationState>>(`/api/events/${eventId}/integrations`);
   },
 
-  async updateIntegration(eventId: string, data: { platform: string; credentials?: any; isActive?: boolean }) {
-    return apiRequest<any>(`/api/events/${eventId}/integrations`, {
+  /**
+   * Step 1 of connecting Discord/Slack. Returns the provider's consent URL; the
+   * caller navigates there. Deliberately a POST so the access token stays in the
+   * Authorization header rather than the query string.
+   */
+  async beginOAuthConnect(platform: 'discord' | 'slack', eventId: string) {
+    return apiRequest<{ authorizeUrl: string }>(`/api/oauth/${platform}/connect`, {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({ eventId }),
+    });
+  },
+
+  /** Whether the server has app credentials configured for this platform. */
+  async getOAuthStatus(platform: 'discord' | 'slack' | 'telegram') {
+    return apiRequest<{ platform: string; configured: boolean; usesOauth: boolean }>(
+      `/api/oauth/${platform}/status`
+    );
+  },
+
+  /**
+   * Telegram has no bot OAuth, so it uses a token from @BotFather instead.
+   * `verifyTelegramToken` checks the token against Telegram before the user
+   * commits to it, so a typo isn't discovered after saving.
+   */
+  async verifyTelegramToken(token: string) {
+    return apiRequest<{ valid: boolean; botUsername: string | null; error?: string }>('/api/oauth/telegram/verify', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+  },
+
+  async connectTelegramBot(eventId: string, token: string) {
+    return apiRequest<{ connected: boolean; botUsername: string }>('/api/oauth/telegram/connect', {
+      method: 'POST',
+      body: JSON.stringify({ eventId, token }),
+    });
+  },
+
+  /** Restarts a saved connection whose socket failed to open. */
+  async reconnectIntegration(eventId: string, platform: string) {
+    return apiRequest<IntegrationState>(`/api/events/${eventId}/integrations/${platform}/reconnect`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  },
+
+  /** Stops the adapter and deletes the stored (encrypted) credentials. */
+  async disconnectIntegration(eventId: string, platform: string) {
+    return apiRequest<{ disconnected: boolean }>(`/api/oauth/${platform}/disconnect`, {
+      method: 'DELETE',
+      body: JSON.stringify({ eventId }),
+    });
+  },
+
+  // --------------------------------------------------------------------------
+  // FAQ import — pull existing Q&A out of a connected channel
+  // --------------------------------------------------------------------------
+
+  /**
+   * Channels that FAQs can be imported from. Only Discord and Slack support
+   * this: the Telegram Bot API gives bots no access to chat history.
+   */
+  async getImportSources(eventId: string, platform: string) {
+    return apiRequest<{ platform: string; sources: { id: string; name: string; topic?: string }[] }>(
+      `/api/events/${eventId}/integrations/${platform}/import-sources`
+    );
+  },
+
+  /** Imports pinned Q&A from the chosen channels as FAQs. */
+  async importFaqs(eventId: string, platform: string, sourceIds: string[], limit?: number) {
+    return apiRequest<{
+      imported: number;
+      skipped: number;
+      failed: number;
+      truncated: boolean;
+      faqs: { id: string; question: string }[];
+      message: string;
+    }>(`/api/events/${eventId}/integrations/${platform}/import-faqs`, {
+      method: 'POST',
+      body: JSON.stringify({ sourceIds, limit }),
     });
   },
 

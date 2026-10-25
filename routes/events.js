@@ -7,6 +7,8 @@ const { authenticate } = require('../middleware/auth');
 const { generateOnboardingFAQs, generateEventDescription } = require('../services/ai');
 const { getEmbedding } = require('../services/embedding');
 const { syncFaqVector } = require('../services/vectorStore');
+const { resolveMistralKey } = require('../services/mistralKey');
+const logger = require('../utils/logger');
 
 // Generate unique invite code helper
 const generateInviteCode = async () => {
@@ -20,6 +22,42 @@ const generateInviteCode = async () => {
     return code;
 };
 
+/**
+ * Seed an event's starter FAQs with embeddings.
+ *
+ * Fire-and-forget: the caller has already responded. Runs the LLM generation
+ * and the embedding calls concurrently, and never throws — a new event without
+ * starter FAQs is recoverable from the dashboard, a failed request is not.
+ */
+const seedStarterFAQs = async (eventId, userId) => {
+    const event = await Event.findById(eventId);
+    if (!event) return;
+
+    const prompts = await generateOnboardingFAQs(event);
+    if (!prompts?.length) return;
+
+    const { key: mistralApiKey } = await resolveMistralKey({ userId });
+
+    await Promise.all(
+        prompts.map(async (p) => {
+            // Still save the FAQ even if embedding generation fails — the text
+            // is what the admin sees in the dashboard.
+            const embedding = await getEmbedding(p.question, { apiKey: mistralApiKey || undefined }).catch(() => null);
+            const faq = await Faq.create({
+                eventId,
+                question: p.question,
+                answer: p.answer,
+                platforms: ['discord', 'slack', 'telegram'],
+                embedding: embedding || []
+            });
+
+            // Non-throwing: syncFaqVector logs failures loudly but never throws,
+            // so a Qdrant outage cannot abort the batch.
+            await syncFaqVector(faq);
+        })
+    );
+};
+
 // Create event
 router.post('/', authenticate, async (req, res) => {
     try {
@@ -28,6 +66,9 @@ router.post('/', authenticate, async (req, res) => {
 
         let finalDescription = req.body.description || '';
 
+        // AI enrichment is opt-in and best-effort. Without GEMINI_API_KEY (or if
+        // the call fails) services/ai.js falls back to the user's own text, so
+        // event creation is never blocked by an optional step.
         if (useAIIntro && details) {
             // Include name in details for the AI prompt
             finalDescription = await generateEventDescription({ ...details, name });
@@ -46,31 +87,16 @@ router.post('/', authenticate, async (req, res) => {
         });
         await newEvent.save();
 
-        let generatedPrompts = [];
-        // Always generate initial FAQs, using the standard generated text
-        generatedPrompts = await generateOnboardingFAQs(newEvent);
+        // Seed FAQs with embeddings so the bot can match from the first question.
+        // This runs AFTER the response is sent (see seedStarterFAQs below):
+        // seeding is a nice-to-have, and making the user wait on a dozen
+        // sequential AI calls (which is what caused multi-minute hangs when a
+        // key was missing) is not worth it.
+        res.status(201).json({ event: newEvent });
 
-        // Auto save generated FAQs with embeddings for instant bot matching
-        if (generatedPrompts && generatedPrompts.length > 0) {
-            for (const p of generatedPrompts) {
-                // Still save the FAQ even if embedding generation fails.
-                const embedding = await getEmbedding(p.question).catch(() => null);
-                const faq = new Faq({
-                    eventId: newEvent._id,
-                    question: p.question,
-                    answer: p.answer,
-                    platforms: ['discord', 'slack', 'telegram'],
-                    embedding: embedding || []
-                });
-                await faq.save();
-
-                // Sync to the vector store so the FAQ is immediately searchable.
-                // Non-throwing: failures are logged loudly, never fatal.
-                await syncFaqVector(faq);
-            }
-        }
-
-        res.status(201).json({ event: newEvent, aiPrompts: generatedPrompts });
+        seedStarterFAQs(newEvent._id, req.user.id).catch((err) =>
+            logger.error(`[events] Starter FAQ seeding failed for ${newEvent._id}: ${err.message}`)
+        );
     } catch (error) {
         res.status(400).json({ error: error.message });
     }

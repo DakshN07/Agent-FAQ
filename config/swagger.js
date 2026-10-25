@@ -14,12 +14,12 @@ const options = {
     },
     servers: [
       {
-        url: 'http://localhost:3000',
-        description: 'Development Server',
+        url: process.env.API_BASE_URL || 'http://localhost:4000',
+        description: 'Local development server (port 4000)',
       },
       {
         url: 'https://api.example.com',
-        description: 'Production Server',
+        description: 'Production server',
       },
     ],
     components: {

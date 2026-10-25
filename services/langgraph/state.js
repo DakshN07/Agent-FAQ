@@ -16,6 +16,11 @@ const StateChannels = {
   
   // Per-event answering threshold (event faqThreshold ?? global settings)
   faqThreshold: null,
+
+  // The Mistral API key resolved for this request (user's own key, else the
+  // deployment env key). Resolved once by the caller and carried through the
+  // graph so every node bills the same account.
+  mistralApiKey: null,
   
   // Routing & execution flags
   nextAgent: null,

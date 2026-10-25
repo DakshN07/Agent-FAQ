@@ -58,20 +58,19 @@ export default function DashboardPage() {
   // Load real connected channels from the integrations API once we know an event.
   useEffect(() => {
     if (!activeEventId) return;
-    api.getIntegrations(activeEventId)
-      .then((integrations) => {
-        if (!Array.isArray(integrations)) return;
-        const active = integrations
-          .filter((i) => i && i.isActive)
-          .map((i) => {
-            const name = (i.platform || '').toLowerCase();
-            if (name.includes('discord')) return 'Discord';
-            if (name.includes('slack')) return 'Slack';
-            if (name.includes('telegram')) return 'Telegram';
-            return i.platform;
-          })
-          .filter(Boolean);
-        if (active.length > 0) setConnectedChannels(active as string[]);
+    api
+      .getIntegrationStatus(activeEventId)
+      .then((status) => {
+        // The response is keyed by platform: { discord: {...}, slack: {...}, ... }
+        const active = Object.entries(status || {})
+          .filter(([, s]) => s?.connected)
+          .map(([platform]) => {
+            if (platform === "discord") return "Discord";
+            if (platform === "slack") return "Slack";
+            if (platform === "telegram") return "Telegram";
+            return platform;
+          });
+        setConnectedChannels(active);
       })
       .catch(() => {});
   }, [activeEventId]);
@@ -89,53 +88,57 @@ export default function DashboardPage() {
   const easeCurve = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
   return (
-    <div className="h-screen w-screen bg-[#060606] text-white flex flex-col overflow-hidden relative selection:bg-purple-500/20">
+    <div className="h-screen w-screen bg-[#07080c] text-white flex flex-col overflow-hidden relative selection:bg-indigo-500/30">
       
       {/* Aurora subtle radial background glows */}
       <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute top-[10%] left-[20%] w-[500px] h-[500px] bg-purple-900/10 rounded-full blur-[130px] mix-blend-screen" />
-        <div className="absolute bottom-[20%] right-[10%] w-[600px] h-[600px] bg-blue-900/5 rounded-full blur-[150px] mix-blend-screen" />
+        <div className="absolute -top-[10%] left-[25%] w-[650px] h-[650px] bg-indigo-600/10 rounded-full blur-[140px] mix-blend-screen" />
+        <div className="absolute top-[40%] right-[10%] w-[550px] h-[550px] bg-blue-600/5 rounded-full blur-[160px] mix-blend-screen" />
+        <div className="absolute -bottom-[10%] left-[10%] w-[500px] h-[500px] bg-purple-600/5 rounded-full blur-[140px] mix-blend-screen" />
       </div>
 
       {/* 1. FLOATING TOP BAR */}
-      <header className="relative z-20 flex-shrink-0 mx-4 mt-4 glass rounded-2xl border border-white/5 py-3 px-6 flex items-center justify-between shadow-lg shadow-black/50">
+      <header className="relative z-20 flex-shrink-0 mx-4 mt-3 glass rounded-xl border border-white/[0.08] py-2.5 px-5 flex items-center justify-between shadow-2xl shadow-black/80">
         
         {/* Left segment (Logo / Workspace breadcrumbs) */}
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20">
+          <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/25 ring-1 ring-white/20">
             <Sparkles className="w-4 h-4 text-white" />
           </div>
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className="font-bold text-gray-400 tracking-wide">AI-Support OS</span>
-            <ChevronRight className="w-3.5 h-3.5 text-gray-600" />
-            <span className="font-semibold text-white tracking-wide">{orgName}</span>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="font-semibold text-slate-400 tracking-wide">Agent-FAQ</span>
+            <span className="text-slate-600">/</span>
+            <span className="font-medium text-slate-200 tracking-wide">{orgName}</span>
           </div>
         </div>
 
         {/* Center segment (System status) */}
-        <div className="hidden md:flex items-center gap-2 bg-emerald-500/5 border border-emerald-500/10 px-3 py-1 rounded-full text-[10px] text-emerald-400 font-mono">
-          <ShieldCheck className="w-3.5 h-3.5" />
-          <span>SYSTEM: OPERATIONAL</span>
-          <span className="text-gray-600">•</span>
-          <span>{activeEventId ? "Event connected" : "No event selected"}</span>
+        <div className="hidden md:flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full text-[11px] text-emerald-400 font-mono tracking-tight shadow-sm">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          <span className="font-semibold">SYSTEM OPERATIONAL</span>
+          <span className="text-emerald-700">•</span>
+          <span className="text-emerald-300/80">{activeEventId ? "Event Connected" : "Ready"}</span>
         </div>
 
         {/* Right segment (Ingestion streams and user state) */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-mono">
-            <Radio className="w-3.5 h-3.5 text-purple-400" />
-            <span>Channels: {connectedChannels.length > 0 ? connectedChannels.join(", ") : "None connected"}</span>
+        <div className="flex items-center gap-3.5">
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-mono bg-white/[0.03] border border-white/[0.06] px-2.5 py-1 rounded-lg">
+            <Radio className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+            <span>{connectedChannels.length > 0 ? connectedChannels.join(", ") : "0 Channels"}</span>
           </div>
           <div className="h-4 w-px bg-white/10" />
           <button
             onClick={handleLogout}
             disabled={loggingOut}
             title="Sign out"
-            className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-[10px] text-red-300 border border-white/5 hover:bg-red-500/20 hover:border-red-500/30 transition-colors cursor-pointer"
+            className="w-7 h-7 rounded-lg bg-white/[0.04] flex items-center justify-center text-slate-400 hover:text-red-300 border border-white/[0.06] hover:bg-red-500/20 hover:border-red-500/30 transition-all cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" />
           </button>
-          <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center font-bold text-xs text-white border border-white/5">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center font-bold text-xs text-white border border-white/20 shadow-md">
             {userInitial}
           </div>
         </div>

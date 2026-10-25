@@ -49,6 +49,19 @@ router.get('/ask', authenticate, async (req, res, next) => {
     const settings = await getSettings().catch(() => null);
     const faqThreshold = normalizeThreshold(event.faqThreshold ?? settings?.similarityThreshold);
 
+    // Resolve the Mistral key up-front. If there is none, fail fast with an
+    // actionable message instead of letting the graph make several doomed
+    // provider calls and surface a confusing 500.
+    const { resolveMistralKey } = require('../services/mistralKey');
+    const { key: mistralApiKey, source: keySource } = await resolveMistralKey({ userId: req.user.id });
+    if (!mistralApiKey) {
+      return res.status(503).json({
+        error:
+          'No Mistral API key is configured. Add yours in Settings, or set MISTRAL_API_KEY on the server.',
+        code: 'MISTRAL_KEY_MISSING',
+      });
+    }
+
     const { createSupportWorkflow } = require('../services/langgraph/workflow');
     const workflow = createSupportWorkflow();
 
@@ -62,9 +75,12 @@ router.get('/ask', authenticate, async (req, res, next) => {
       confidenceScore: 0.0,
       finalAnswer: null,
       faqThreshold,
+      mistralApiKey,
     };
 
     const finalState = await workflow.invoke(initialState);
+
+    logger.info(`[ai] answered (key source: ${keySource}, matched: ${finalState.confidenceScore >= faqThreshold})`);
 
     if (finalState.isFlagged) {
       return res.status(200).json({
@@ -81,7 +97,26 @@ router.get('/ask', authenticate, async (req, res, next) => {
       matched: confidence >= faqThreshold,
     });
   } catch (error) {
-    logger.error(`[ai] Workflow failed: ${error.message}`);
+    // Provider-level failures (bad key, quota, rate limit, timeout) are the
+    // common case here. Translate the common ones into actionable messages so
+    // the user is not staring at an opaque 500.
+    const status = error?.status ?? error?.response?.status;
+
+    if (status === 401 || status === 403) {
+      logger.error('[ai] Mistral rejected the API key');
+      return res.status(502).json({
+        error: 'Mistral rejected the configured API key. Please re-enter a valid key in Settings.',
+        code: 'MISTRAL_KEY_INVALID',
+      });
+    }
+    if (status === 429) {
+      return res.status(429).json({
+        error: 'Mistral rate limit reached or the account is out of credit. Try again shortly.',
+        code: 'MISTRAL_RATE_LIMITED',
+      });
+    }
+
+    logger.error(`[ai] Workflow failed: ${error.message}`, { stack: error.stack });
     next(error);
   }
 });

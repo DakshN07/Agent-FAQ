@@ -1,7 +1,18 @@
-const express = require('express');
+const path = require('path');
+const fs = require('fs');
 const router = express.Router();
 const integrationManager = require('../services/IntegrationManager');
 const Event = require('../models/Event');
+
+// Serve the embeddable script directly from the backend
+const WIDGET_JS_PATH = path.join(__dirname, '../frontend/public/widget.js');
+router.get('/script.js', (req, res) => {
+    if (fs.existsSync(WIDGET_JS_PATH)) {
+        res.setHeader('Content-Type', 'application/javascript');
+        return res.sendFile(WIDGET_JS_PATH);
+    }
+    res.status(404).send('// widget script not found');
+});
 
 // Get Widget Settings (Color, Name, etc.)
 router.get('/settings/:eventId', async (req, res) => {

@@ -19,21 +19,25 @@ const passwordLimiter = createAuthLimiter({ max: 5, message: 'Too many password 
 // GET /api/auth/me
 router.get('/me', authenticate, async (req, res) => {
   try {
-    // Example of explicit Redis cache logic
+    // Cached copies are only written by this route, and we deliberately strip
+    // the (select:false) Mistral key plus anything else sensitive before
+    // caching, so the cached payload is safe to serve verbatim.
+    const cacheKey = `user:${req.user.id}`;
     if (redisClient) {
-      const cachedUser = await redisClient.get(`user:${req.user.id}`);
+      const cachedUser = await redisClient.get(cacheKey);
       if (cachedUser) {
         return res.json(JSON.parse(cachedUser));
       }
     }
 
+    // mistralApiKey carries `select: false` in the schema, so it is never
+    // returned even if we forget to exclude it.
     const user = await User.findById(req.user.id).select('-password');
-    
+
     if (redisClient && user) {
-      // Cache for 1 hour
-      await redisClient.setEx(`user:${req.user.id}`, 3600, JSON.stringify(user));
+      await redisClient.setEx(cacheKey, 3600, JSON.stringify(user));
     }
-    
+
     res.json(user);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -234,6 +238,104 @@ router.post('/logout', async (req, res) => {
   }
   tokenService.clearRefreshCookie(res);
   res.json({ message: 'Logged out' });
+});
+
+// ---------------------------------------------------------------------------
+// Bring-your-own Mistral API key
+//
+// The AI features (embeddings + the LangGraph agents) need a Mistral API key.
+// Rather than requiring one deployment-wide secret, each user supplies their own
+// during onboarding. The key is verified live against Mistral before it is
+// accepted, then stored encrypted (AES-256-GCM).
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /api/auth/mistral-key
+ * Status only — never returns the key itself, just whether one is stored, which
+ * source AI calls will actually bill, and when it was last verified.
+ */
+router.get('/mistral-key', authenticate, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('+mistralApiKey mistralKeyVerifiedAt');
+    const hasUserKey = Boolean(user?.mistralApiKey?.ciphertext);
+    const envFallback = require('../services/mistralKey').envKey();
+
+    res.json({
+      // The UI prompts for a key unless this is true.
+      configured: hasUserKey || Boolean(envFallback),
+      source: hasUserKey ? 'user' : (envFallback ? 'env' : 'none'),
+      // A stored-but-never-verified key should still nag the user.
+      verifiedAt: user?.mistralKeyVerifiedAt || null,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * PUT /api/auth/mistral-key
+ * Verifies the submitted key against Mistral, then stores it encrypted.
+ * A key that fails verification is never persisted.
+ */
+router.put('/mistral-key', authenticate, async (req, res) => {
+  try {
+    const { apiKey } = req.body || {};
+
+    if (typeof apiKey !== 'string' || !apiKey.trim()) {
+      return res.status(400).json({ error: 'apiKey is required' });
+    }
+
+    const mistralKey = require('../services/mistralKey');
+
+    const check = await mistralKey.verifyKey(apiKey);
+    if (!check.ok) {
+      return res.status(400).json({ error: check.error });
+    }
+
+    const { encrypt } = require('../utils/crypto');
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    user.mistralApiKey = encrypt(apiKey.trim());
+    user.mistralKeyVerifiedAt = new Date();
+    await user.save();
+
+    // The /me response is cached for an hour and now carries a stale
+    // `mistralKeyVerifiedAt`, so drop it.
+    if (redisClient) {
+      await redisClient.del(`user:${req.user.id}`);
+    }
+
+    res.json({
+      message: 'Mistral API key saved.',
+      source: 'user',
+      verifiedAt: user.mistralKeyVerifiedAt,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/auth/mistral-key — fall back to the deployment key (or none)
+router.delete('/mistral-key', authenticate, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('+mistralApiKey');
+    if (user) {
+      user.mistralApiKey = null;
+      user.mistralKeyVerifiedAt = null;
+      await user.save();
+    }
+
+    if (redisClient) {
+      await redisClient.del(`user:${req.user.id}`);
+    }
+
+    res.json({ message: 'Mistral API key removed.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // PUT /api/auth/password — change password; revokes all refresh sessions

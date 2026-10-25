@@ -5,6 +5,9 @@ import { Sparkles, Building, ArrowRight, Lock, User, Mail, Loader2, AlertCircle 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import MistralKeyStep from "@/components/MistralKeyStep";
+
+type Step = "account" | "mistral";
 
 export default function RegisterOrgPage() {
   const [orgName, setOrgName] = useState("");
@@ -13,6 +16,7 @@ export default function RegisterOrgPage() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [step, setStep] = useState<Step>("account");
   const router = useRouter();
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -27,16 +31,20 @@ export default function RegisterOrgPage() {
         password,
         role: "admin"
       });
-      
+
       // Save user & org details
-      localStorage.setItem('agent_faq_user', JSON.stringify({ 
-        username: adminName, 
-        org: orgName, 
-        email: email, 
+      localStorage.setItem('agent_faq_user', JSON.stringify({
+        username: adminName,
+        org: orgName,
+        email: email,
         role: 'admin'
       }));
       localStorage.setItem('onboarding_orgName', orgName);
-      router.push("/dashboard");
+
+      // Account exists — send them to the AI-key step before the dashboard.
+      // This is where the user is pointed at console.mistral.ai to get their
+      // own key; it can be skipped and added later from Settings.
+      setStep("mistral");
     } catch (err: any) {
       // Never fake a successful registration — surface the real error.
       setError(err?.message || "Registration failed. Please try again.");
@@ -56,11 +64,30 @@ export default function RegisterOrgPage() {
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-blue-600 shadow-lg shadow-purple-500/20 mb-4">
             <Sparkles className="h-6 w-6 text-white" />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-center">Create Organization</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-center">
+            {step === "account" ? "Create Organization" : "Connect your AI"}
+          </h1>
           <p className="text-gray-400 mt-2 text-center text-sm">
-            Set up your organization to start managing events.
+            {step === "account"
+              ? "Set up your organization to start managing events."
+              : "One last step and your AI assistant is ready."}
           </p>
         </div>
+
+        {/* Progress indicator */}
+        {step === "mistral" && (
+          <div className="flex items-center justify-center gap-2 mb-6 text-[11px] text-gray-500">
+            <span className="flex items-center gap-1.5 text-emerald-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              Account created
+            </span>
+            <span className="w-8 h-px bg-white/15" />
+            <span className="flex items-center gap-1.5 text-purple-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+              Add AI key
+            </span>
+          </div>
+        )}
 
         <div className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-8 space-y-6">
           {error && (
@@ -70,6 +97,8 @@ export default function RegisterOrgPage() {
             </div>
           )}
 
+          {/* ---- Step 1: account details ---- */}
+          {step === "account" && (
           <form className="space-y-4" onSubmit={handleRegister}>
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-200">Organization Name</label>
@@ -143,14 +172,22 @@ export default function RegisterOrgPage() {
               )}
             </button>
           </form>
+          )}
+
+          {/* ---- Step 2: bring-your-own Mistral API key ---- */}
+          {step === "mistral" && (
+            <MistralKeyStep onDone={() => router.push("/dashboard")} />
+          )}
         </div>
 
+        {step === "account" && (
         <p className="text-center text-sm text-gray-400 mt-8">
           Already have an organization?{" "}
           <Link href="/login" className="text-white font-medium hover:underline">
             Sign In
           </Link>
         </p>
+        )}
       </div>
     </div>
   );
