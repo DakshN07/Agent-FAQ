@@ -130,11 +130,28 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}, retrie
 
   const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-    credentials: 'include', // round-trip the httpOnly refresh cookie
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+      credentials: 'include', // round-trip the httpOnly refresh cookie
+    });
+  } catch (err: any) {
+    if (typeof window !== 'undefined') {
+      const isHttps = window.location.protocol === 'https:';
+      const isLocalhostTarget = API_BASE_URL.includes('localhost') || API_BASE_URL.includes('127.0.0.1');
+      if (isHttps && isLocalhostTarget) {
+        throw new Error(
+          `Configuration Error: Backend API URL is set to '${API_BASE_URL}'. On your Vercel deployment, please add the 'NEXT_PUBLIC_API_URL' environment variable pointing to your deployed backend (e.g. https://your-backend.onrender.com) and redeploy.`
+        );
+      }
+      throw new Error(
+        `Unable to connect to backend at ${API_BASE_URL}. Ensure your backend server is awake and CORS allows this origin (${window.location.origin}).`
+      );
+    }
+    throw err;
+  }
 
   // Transparent session refresh: on 401 (except for auth endpoints
   // themselves), refresh then retry the original request once.

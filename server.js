@@ -28,12 +28,26 @@ if (config.sentry.dsn) {
 // Security Middleware
 app.use(helmet());
 
-// CORS: in production, only allow explicitly configured origins (CORS_ORIGINS).
+// CORS: in production, allow explicitly configured origins (supports wildcards like https://*.vercel.app).
 const corsOptions = {
-  origin:
-    config.env === 'production'
-      ? (config.corsOrigins.length ? config.corsOrigins : false)
-      : true,
+  origin: (origin, callback) => {
+    // Non-browser requests (curl, server-to-server, mobile) have no origin header
+    if (!origin || config.env !== 'production') {
+      return callback(null, true);
+    }
+    if (!config.corsOrigins || config.corsOrigins.length === 0) {
+      return callback(null, false);
+    }
+    const isAllowed = config.corsOrigins.some((allowed) => {
+      if (allowed === '*' || allowed === origin) return true;
+      if (allowed.includes('*')) {
+        const pattern = new RegExp('^' + allowed.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
+        return pattern.test(origin);
+      }
+      return false;
+    });
+    return callback(null, isAllowed);
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
